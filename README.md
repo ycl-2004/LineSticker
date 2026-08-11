@@ -121,7 +121,7 @@ Prompt 的固定文案集中在 [`app.js`](app.js) 的 `buildAIPrompt()`；這�
 - 不需要橫向操作。
 - 圖片選擇器可以開啟相簿或檔案。
 - 8 / 16 / 24 / 40 張都可選。
-- 一鍵下載會逐張觸發 PNG 下載；可在手機的瀏覽器下載清單或系統檔案 App 找到檔案。
+- 「下載 ZIP」會一次下載包含所有 PNG 的壓縮檔；可在手機的瀏覽器下載清單或系統檔案 App 找到並解壓縮。
 
 ## GitHub Pages 部署
 
@@ -161,7 +161,7 @@ const CLOUD_FOLDER_URL = "https://example.com/your-cloud-folder";
 
 ## 測試案例
 
-請依照 [`tests/test-cases.md`](tests/test-cases.md) 測試 8、16、24、40 張。每組應確認裁切數量、順序、PNG 尺寸、透明度、單張下載與一鍵下載全部 PNG。
+請依照 [`tests/test-cases.md`](tests/test-cases.md) 測試 8、16、24、40 張。每組應確認裁切數量、順序、PNG 尺寸、透明度、單張下載與 ZIP 解壓縮結果。
 
 ## 尚未實作
 

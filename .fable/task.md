@@ -165,3 +165,31 @@
 - `node --check app.js`、`git diff --check` 通过。
 - ego-browser 1280px：4 × 6 测试图的预览标签显示「最終裁切外框」，网格为 4 × 6，且无横向溢出。
 - canvas 像素检查：外框红色主线为 RGB `184, 65, 70`、可见浅红边缘带；内部虚线为 RGB `12, 86, 90` 且带白色衬底；拖曳点为 RGB `255, 184, 102`。本次只改变绘制样式，既有指针拖曳／裁切计算函数未改动。
+
+---
+
+# LINE Sticker Cutter — 恢复 ZIP 整包下载
+
+## Goal
+
+将「下载全部」恢复为一次生成一个包含所有 PNG 的 ZIP 档案，而非浏览器逐张触发下载。
+
+## Acceptance criteria
+
+- [x] 主下载按钮明确显示 ZIP，并在单次点击后下载一个包含所有 PNG 的 `.zip` 档案。
+- [x] ZIP 在浏览器本地以无压缩（STORE）方式产生，不上传任何图片，也不需要第三方 CDN。
+- [x] 单张 PNG 下载保留，README 与测试说明同步为 ZIP 行为。
+
+## Requirements (append-only)
+
+1. 恢复全部输出为一个 ZIP，而不是一次下载所有 PNG。
+
+## Decision log
+
+- 2026-08-10：采用内建、无压缩 ZIP 写入器，避免恢复已删除的第三方压缩库或增加网络依赖；PNG 本身已经压缩，STORE 不会牺牲成品品质。
+
+## Evidence
+
+- `node --check app.js`、`git diff --check` 通过。
+- ego-browser 390px：透明 2 × 4 测试图完成 `8 / 8` 张，主按钮显示「下載 ZIP（8 張 PNG）」。
+- 实际点击 ZIP 后取得 `application/zip`、44,208 bytes；local-file 签名为 `0x04034b50`、中央目录结束签名为 `0x06054b50`，中央目录有 8 项：`sticker_01.png` 至 `sticker_08.png`。

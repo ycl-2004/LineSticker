@@ -1357,8 +1357,8 @@
     const readyCount = state.stickers.length;
     elements.downloadAllButton.disabled = readyCount === 0 || state.isProcessing;
     elements.downloadAllLabel.textContent = readyCount
-      ? "下載全部 PNG（" + readyCount + " 張）"
-      : "下載全部 PNG";
+      ? "下載 ZIP（" + readyCount + " 張 PNG）"
+      : "下載 ZIP（所有 PNG）";
   }
 
   function openPreview(index) {
@@ -1396,21 +1396,114 @@
     triggerDownload(sticker.blob, sticker.filename);
   }
 
-  function downloadAllStickers() {
+  async function downloadAllStickers() {
     if (!state.stickers.length || state.isProcessing) {
       return;
     }
 
     elements.downloadAllButton.disabled = true;
-    elements.downloadAllLabel.textContent = "正在下載 " + state.stickers.length + " 張 PNG…";
+    elements.downloadAllLabel.textContent = "正在打包 ZIP…";
 
-    state.stickers.forEach(function (sticker) {
-      triggerDownload(sticker.blob, sticker.filename);
-    });
-
-    window.setTimeout(function () {
+    try {
+      const zipBlob = await createZipBlob(state.stickers);
+      const filename = "LINE_Stickers_" + String(state.selectedCount).padStart(2, "0") + ".zip";
+      triggerDownload(zipBlob, filename);
+    } catch (error) {
+      console.error(error);
+      showError("ZIP 建立失敗，請稍後再試。", elements.errorMessage);
+    } finally {
       updateDownloadAllButton();
-    }, 200);
+    }
+  }
+
+  async function createZipBlob(stickers) {
+    const encoder = new TextEncoder();
+    const date = new Date();
+    const dosDateTime = getDosDateTime(date);
+    let offset = 0;
+    const localParts = [];
+    const centralParts = [];
+
+    for (let index = 0; index < stickers.length; index += 1) {
+      const sticker = stickers[index];
+      const nameBytes = encoder.encode(sticker.filename);
+      const data = new Uint8Array(await sticker.blob.arrayBuffer());
+      const crc = calculateCrc32(data);
+      const localHeader = new Uint8Array(30 + nameBytes.length);
+      const localView = new DataView(localHeader.buffer);
+
+      localView.setUint32(0, 0x04034b50, true);
+      localView.setUint16(4, 20, true);
+      localView.setUint16(6, 0, true);
+      localView.setUint16(8, 0, true);
+      localView.setUint16(10, dosDateTime.time, true);
+      localView.setUint16(12, dosDateTime.date, true);
+      localView.setUint32(14, crc, true);
+      localView.setUint32(18, data.length, true);
+      localView.setUint32(22, data.length, true);
+      localView.setUint16(26, nameBytes.length, true);
+      localView.setUint16(28, 0, true);
+      localHeader.set(nameBytes, 30);
+      localParts.push(localHeader, data);
+
+      const centralHeader = new Uint8Array(46 + nameBytes.length);
+      const centralView = new DataView(centralHeader.buffer);
+      centralView.setUint32(0, 0x02014b50, true);
+      centralView.setUint16(4, 20, true);
+      centralView.setUint16(6, 20, true);
+      centralView.setUint16(8, 0, true);
+      centralView.setUint16(10, 0, true);
+      centralView.setUint16(12, dosDateTime.time, true);
+      centralView.setUint16(14, dosDateTime.date, true);
+      centralView.setUint32(16, crc, true);
+      centralView.setUint32(20, data.length, true);
+      centralView.setUint32(24, data.length, true);
+      centralView.setUint16(28, nameBytes.length, true);
+      centralView.setUint16(30, 0, true);
+      centralView.setUint16(32, 0, true);
+      centralView.setUint16(34, 0, true);
+      centralView.setUint16(36, 0, true);
+      centralView.setUint32(38, 0, true);
+      centralView.setUint32(42, offset, true);
+      centralHeader.set(nameBytes, 46);
+      centralParts.push(centralHeader);
+      offset += localHeader.length + data.length;
+    }
+
+    const centralOffset = offset;
+    const centralSize = centralParts.reduce(function (total, part) {
+      return total + part.length;
+    }, 0);
+    const endOfCentralDirectory = new Uint8Array(22);
+    const endView = new DataView(endOfCentralDirectory.buffer);
+    endView.setUint32(0, 0x06054b50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, stickers.length, true);
+    endView.setUint16(10, stickers.length, true);
+    endView.setUint32(12, centralSize, true);
+    endView.setUint32(16, centralOffset, true);
+    endView.setUint16(20, 0, true);
+
+    return new Blob(localParts.concat(centralParts, [endOfCentralDirectory]), { type: "application/zip" });
+  }
+
+  function getDosDateTime(date) {
+    return {
+      time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+      date: ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+    };
+  }
+
+  function calculateCrc32(bytes) {
+    let crc = 0xffffffff;
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc ^= bytes[index];
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
   }
 
   function triggerDownload(blob, filename) {
