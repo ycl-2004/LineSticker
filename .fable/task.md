@@ -67,3 +67,38 @@
 - ego-browser 390px：8 张真实裁切完成（8 / 8、8 个结果、无错误）；「下载全部 PNG（8 张）」同步触发 `sticker_01.png` 至 `sticker_08.png` 共 8 次，操作后按钮恢复可用。
 - ego-browser 390px：移除图片后 hero、初始上传文字与禁用裁切状态均恢复，预览与结果隐藏。
 - ego-browser 320px 初始态与 1280px 上传态均无横向溢出；桌面上传态预览宽 1036px，数量区位于其后且裁切按钮可用。
+
+---
+
+# LINE Sticker Cutter — Resolution Controls
+
+## Goal
+
+让使用者能控制生成大图与导出 PNG 的解析度，同时清楚区分真实来源品质、浏览器插值与 LINE 上架规格。
+
+## Acceptance criteria
+
+- [x] 可选择每格 256／512／1024px 的生成大图品质，建议尺寸与 AI Prompt 同步更新。
+- [x] 可选择 LINE 合规、保留原尺寸或 2× HD 主档导出；非 LINE 输出不能被标示成合规。
+- [x] 上传低解析来源时明确提示「放大不会补回真实细节」，但仍保留可用导出路径。
+- [x] 现有裁切、近白去背、预览、下载与 8／16／24／40 张流程保持可用。
+
+## Requirements (append-only)
+
+1. 让用户可调整生成与导出的解析度／清晰度，改善贴图小、糊的问题。
+
+## Decision log
+
+- 2026-08-10：LINE Creators Market 的单张 PNG 上限为 370×320、1MB，并会自动缩放；因此 LINE 模式不可通过提高导出尺寸改善真实细节。
+- 2026-08-10：浏览器 Canvas `drawImage()` 和 image smoothing 只做重采样，不能从 256px 来源重建细节；真正提升品质需先以 512px 或 1024px 每格生成／上传来源大图。
+- 2026-08-10：默认提供 LINE 合规导出与非 LINE 2× HD 主档两个清楚标示的用途，避免大档被误上传到 LINE。
+
+## Evidence
+
+- 诊断：当前 `resizeSticker()` 以 `Math.min(1, ...)` 限制缩放，所以 256px 来源裁切出的约 254px 内容不会被放大；Prompt 当前每格也只要求 256px。
+- 参考：[LINE Creators Market sticker guidelines](https://creator.line.me/en/guideline/sticker/)；[MDN Canvas image smoothing](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled)。
+- `node --check app.js` 与 `git diff --check` 通过。
+- ego-browser 390px：标准模式 Prompt 含 `1024 × 512 px` 与 `256 × 256 px`；高清模式含 `2048 × 1024 px` 与 `512 × 512 px`；无横向溢出。
+- ego-browser 390px：8 张来源在 LINE 模式完成 8／8，首张为 198×198、状态「✓ 符合基本規格」；2× HD 完成 8／8，首张为 396×396、状态「2× HD 主檔（非 LINE）」且批量档名为 `sticker_01_hd.png`～`sticker_08_hd.png`。
+- ego-browser 320px：8／16／24／40 的高清建议尺寸分别为 2048×1024、2048×2048、2048×3072、2560×4096；Prompt 默认收起且无横向溢出。
+- ego-browser 上传每格约 200px 的测试来源：明确显示「低于所选 512 px／格；匯出放大不會補回真實細節」。

@@ -8,6 +8,18 @@
     40: Object.freeze({ columns: 5, rows: 8, imageWidth: 1280, imageHeight: 2048, cellSize: 256 })
   });
 
+  const SOURCE_RESOLUTION_OPTIONS = Object.freeze({
+    standard: Object.freeze({ scale: 1, label: "標準", description: "256 px／格" }),
+    high: Object.freeze({ scale: 2, label: "高清", description: "512 px／格" }),
+    master: Object.freeze({ scale: 4, label: "主檔", description: "1024 px／格" })
+  });
+
+  const EXPORT_PRESETS = Object.freeze({
+    line: Object.freeze({ scale: 1, maxWidth: 370, maxHeight: 320, label: "LINE", lineCompliant: true }),
+    original: Object.freeze({ scale: 1, maxWidth: Infinity, maxHeight: Infinity, label: "原尺寸", lineCompliant: false }),
+    hd: Object.freeze({ scale: 2, maxWidth: 1480, maxHeight: 1280, label: "2× HD", lineCompliant: false })
+  });
+
   const DEFAULT_STICKER_PHRASES = Object.freeze([
     "安安👋",
     "揪咪😉",
@@ -67,6 +79,8 @@
 
   const state = {
     selectedCount: DEFAULT_STICKER_COUNT,
+    sourceResolution: "high",
+    exportResolution: "line",
     sourceFile: null,
     sourceImage: null,
     sourceCanvas: null,
@@ -117,6 +131,9 @@
       "selected-ratio",
       "recommended-image-size",
       "recommended-cell-size",
+      "source-resolution-status",
+      "source-resolution-note",
+      "export-resolution-note",
       "crop-preview-section",
       "crop-preview-canvas",
       "preview-grid-badge",
@@ -154,6 +171,8 @@
     });
 
     elements.countInputs = Array.from(document.querySelectorAll('input[name="sticker-count"]'));
+    elements.sourceResolutionInputs = Array.from(document.querySelectorAll('input[name="source-resolution"]'));
+    elements.exportResolutionInputs = Array.from(document.querySelectorAll('input[name="export-resolution"]'));
   }
 
   function bindEvents() {
@@ -168,6 +187,22 @@
       input.addEventListener("change", function () {
         if (input.checked) {
           setStickerCount(Number(input.value));
+        }
+      });
+    });
+
+    elements.sourceResolutionInputs.forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) {
+          setSourceResolution(input.value);
+        }
+      });
+    });
+
+    elements.exportResolutionInputs.forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) {
+          setExportResolution(input.value);
         }
       });
     });
@@ -244,6 +279,7 @@
 
     state.selectedCount = count;
     const config = getGridConfig(count);
+    const sourceSpec = getSourceImageSpec(count);
 
     elements.countInputs.forEach(function (input) {
       const isSelected = Number(input.value) === count;
@@ -254,8 +290,8 @@
     elements.selectedCount.textContent = count + " 張";
     elements.selectedGrid.textContent = config.columns + " × " + config.rows;
     elements.selectedRatio.textContent = "比例 " + config.columns + ":" + config.rows;
-    elements.recommendedImageSize.textContent = config.imageWidth + " × " + config.imageHeight + " px";
-    elements.recommendedCellSize.textContent = config.cellSize + " × " + config.cellSize + " px";
+    elements.recommendedImageSize.textContent = sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px";
+    elements.recommendedCellSize.textContent = sourceSpec.cellSize + " × " + sourceSpec.cellSize + " px";
     elements.sourceGrid.textContent = state.sourceCanvas ? config.columns + " × " + config.rows : "—";
     renderPhraseEditor();
     if (state.sourceCanvas) {
@@ -270,6 +306,7 @@
     }
 
     updateRatioWarning();
+    updateResolutionUI();
     updateCropButton();
   }
 
@@ -329,6 +366,7 @@
 
   function buildAIPrompt() {
     const config = getGridConfig(state.selectedCount);
+    const sourceSpec = getSourceImageSpec(state.selectedCount);
     const phrases = getCurrentPhrases();
     const ratio = formatSimplifiedRatio(config.columns, config.rows);
     const phraseBlock = phrases.map(function (phrase) {
@@ -340,10 +378,10 @@
       "",
       "【輸出與版面規格】",
       "- 最終只輸出一張完整圖片，不要輸出多張分開的圖片。",
-      "- 圖片尺寸：" + config.imageWidth + " × " + config.imageHeight + " px。",
+      "- 圖片尺寸：" + sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px。",
       "- 圖片比例：" + ratio + "。",
       "- 排列方式：" + config.columns + " 欄 × " + config.rows + " 行，共 " + state.selectedCount + " 格。",
-      "- 每格尺寸：" + config.cellSize + " × " + config.cellSize + " px。",
+      "- 每格尺寸：" + sourceSpec.cellSize + " × " + sourceSpec.cellSize + " px。",
       "- 排列順序由左至右、由上至下。",
       "- 每一格只能有一張 LINE 貼圖、一位完整人物與一句對應文字。",
       "- 每個人物與文字都必須完整留在自己的格子內，不可跨越格線、裁切、重疊或跑到相鄰格子。",
@@ -439,6 +477,68 @@
 
   function getGridConfig(count) {
     return STICKER_CONFIGS[count] || STICKER_CONFIGS[DEFAULT_STICKER_COUNT];
+  }
+
+  function getSourceImageSpec(count) {
+    const config = getGridConfig(count);
+    const resolution = SOURCE_RESOLUTION_OPTIONS[state.sourceResolution];
+    return {
+      imageWidth: config.imageWidth * resolution.scale,
+      imageHeight: config.imageHeight * resolution.scale,
+      cellSize: config.cellSize * resolution.scale
+    };
+  }
+
+  function getExportPreset() {
+    return EXPORT_PRESETS[state.exportResolution];
+  }
+
+  function setSourceResolution(resolution) {
+    if (!SOURCE_RESOLUTION_OPTIONS[resolution]) {
+      return;
+    }
+    state.sourceResolution = resolution;
+    elements.sourceResolutionInputs.forEach(function (input) {
+      const isSelected = input.value === resolution;
+      input.checked = isSelected;
+      input.closest(".resolution-option").classList.toggle("is-selected", isSelected);
+    });
+    const sourceSpec = getSourceImageSpec(state.selectedCount);
+    elements.recommendedImageSize.textContent = sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px";
+    elements.recommendedCellSize.textContent = sourceSpec.cellSize + " × " + sourceSpec.cellSize + " px";
+    renderPhraseEditor();
+    updateResolutionUI();
+    updateBackgroundNote();
+  }
+
+  function setExportResolution(resolution) {
+    if (!EXPORT_PRESETS[resolution]) {
+      return;
+    }
+    state.exportResolution = resolution;
+    elements.exportResolutionInputs.forEach(function (input) {
+      const isSelected = input.value === resolution;
+      input.checked = isSelected;
+      input.closest(".resolution-option").classList.toggle("is-selected", isSelected);
+    });
+    if (state.stickers.length > 0) {
+      clearStickers();
+      elements.resultsSection.hidden = true;
+    }
+    updateResolutionUI();
+    updateCropButton();
+    updateDownloadAllButton();
+  }
+
+  function updateResolutionUI() {
+    const sourceResolution = SOURCE_RESOLUTION_OPTIONS[state.sourceResolution];
+    const sourceSpec = getSourceImageSpec(state.selectedCount);
+    const exportPreset = getExportPreset();
+    elements.sourceResolutionStatus.textContent = sourceResolution.label + "來源";
+    elements.sourceResolutionNote.textContent = "推薦以 " + sourceResolution.description + " 生成大圖（" + sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px）；它會更新 AI Prompt，不會放大已上傳圖片的真實細節。";
+    elements.exportResolutionNote.textContent = exportPreset.lineCompliant
+      ? "LINE 模式符合單張最多 370 × 320 px、1 MB 的上架規格。"
+      : exportPreset.label + " 是非 LINE 主檔；放大可增加像素尺寸，但無法憑空補回模糊來源的細節。";
   }
 
   async function handleFileUpload(file) {
@@ -600,6 +700,15 @@
     }
     if (isLowResolution(state.sourceCanvas, state.selectedCount)) {
       notes.push("⚠️ 圖片解析度可能不足，建議使用 AI 生成的高解析度圖片。");
+    }
+    const sourceSpec = getSourceImageSpec(state.selectedCount);
+    const config = getGridConfig(state.selectedCount);
+    const actualCellSize = Math.min(
+      state.sourceCanvas.width / config.columns,
+      state.sourceCanvas.height / config.rows
+    );
+    if (actualCellSize < sourceSpec.cellSize) {
+      notes.push("目前每格約 " + Math.round(actualCellSize) + " px，低於所選 " + sourceSpec.cellSize + " px／格；匯出放大不會補回真實細節。");
     }
     elements.backgroundNote.textContent = notes.join(" ");
   }
@@ -888,7 +997,7 @@
         const validation = validateSticker(blob, resizedCanvas.width, resizedCanvas.height);
         state.stickers.push({
           index: index,
-          filename: "sticker_" + String(index + 1).padStart(2, "0") + ".png",
+          filename: getStickerFilename(index),
           blob: blob,
           url: URL.createObjectURL(blob),
           width: resizedCanvas.width,
@@ -1066,11 +1175,14 @@
   }
 
   function resizeSticker(canvas) {
-    const scale = Math.min(
-      1,
-      MAX_STICKER_WIDTH / canvas.width,
-      MAX_STICKER_HEIGHT / canvas.height
+    const exportPreset = getExportPreset();
+    const boundedScale = Math.min(
+      exportPreset.maxWidth / canvas.width,
+      exportPreset.maxHeight / canvas.height
     );
+    const scale = exportPreset.lineCompliant
+      ? Math.min(1, boundedScale)
+      : Math.min(exportPreset.scale, boundedScale);
     const width = Math.max(1, Math.round(canvas.width * scale));
     const height = Math.max(1, Math.round(canvas.height * scale));
 
@@ -1093,6 +1205,9 @@
     if (!blob || blob.type !== "image/png") {
       return { valid: false, message: "⚠ 格式異常" };
     }
+    if (!getExportPreset().lineCompliant) {
+      return { valid: true, message: getExportPreset().label + " 主檔（非 LINE）" };
+    }
     if (width > MAX_STICKER_WIDTH || height > MAX_STICKER_HEIGHT) {
       return { valid: false, message: "⚠ 尺寸超限" };
     }
@@ -1100,6 +1215,11 @@
       return { valid: false, message: "⚠️ 檔案過大" };
     }
     return { valid: true, message: "✓ 符合基本規格" };
+  }
+
+  function getStickerFilename(index) {
+    const suffix = state.exportResolution === "hd" ? "_hd" : state.exportResolution === "original" ? "_master" : "";
+    return "sticker_" + String(index + 1).padStart(2, "0") + suffix + ".png";
   }
 
   function renderResults() {

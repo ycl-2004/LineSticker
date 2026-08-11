@@ -247,6 +247,41 @@
               <span class="summary-label">單格</span>
               <strong id="recommended-cell-size">256 × 256 px</strong>
             </div>
+            <section class="resolution-panel" aria-labelledby="resolution-title">
+              <div class="resolution-heading">
+                <div>
+                  <p class="overline">RESOLUTION</p>
+                  <h3 id="resolution-title">清晰度與輸出</h3>
+                </div>
+                <span class="resolution-status" id="source-resolution-status">高清來源</span>
+              </div>
+              <fieldset class="resolution-options">
+                <legend>生成大圖品質</legend>
+                <label class="resolution-option"
+                  ><input type="radio" name="source-resolution" value="standard" /><span><strong>標準</strong><small>256 px／格</small></span></label
+                >
+                <label class="resolution-option is-selected"
+                  ><input type="radio" name="source-resolution" value="high" checked /><span><strong>高清</strong><small>512 px／格</small></span></label
+                >
+                <label class="resolution-option"
+                  ><input type="radio" name="source-resolution" value="master" /><span><strong>主檔</strong><small>1024 px／格</small></span></label
+                >
+              </fieldset>
+              <p class="resolution-note" id="source-resolution-note" aria-live="polite">推薦以 512 px／格生成大圖；它會更新 AI Prompt，不會放大已上傳圖片的真實細節。</p>
+              <fieldset class="resolution-options export-resolution-options">
+                <legend>導出用途</legend>
+                <label class="resolution-option is-selected"
+                  ><input type="radio" name="export-resolution" value="line" checked /><span><strong>LINE</strong><small>最多 370 × 320</small></span></label
+                >
+                <label class="resolution-option"
+                  ><input type="radio" name="export-resolution" value="original" /><span><strong>原尺寸</strong><small>不重新取樣</small></span></label
+                >
+                <label class="resolution-option"
+                  ><input type="radio" name="export-resolution" value="hd" /><span><strong>2× HD</strong><small>非 LINE 主檔</small></span></label
+                >
+              </fieldset>
+              <p class="resolution-note" id="export-resolution-note" aria-live="polite">LINE 模式符合單張最多 370 × 320 px、1 MB 的上架規格。</p>
+            </section>
             <details class="prompt-builder">
               <summary class="prompt-builder-header">
                 <div>
