@@ -1,13 +1,12 @@
 # AI LINE Sticker Maker
 
-手機優先的純前端工具，將 AI 生成的 LINE 貼圖排列大圖，自動裁切成 PNG 並打包成 ZIP。
+手機優先的純前端工具，將 AI 生成的 LINE 貼圖排列大圖，自動裁切成個別 PNG。
 
 ## 技術架構
 
 - HTML
 - CSS
 - JavaScript
-- JSZip（本地 `vendor/jszip.min.js`）
 
 沒有 Python、Node.js backend、資料庫、登入系統、使用者帳號或圖片上傳 API。圖片會留在使用者的瀏覽器中處理。
 
@@ -19,9 +18,6 @@ Line Sticker/
 ├── style.css               # Mobile-first responsive styles
 ├── app.js                  # 圖片處理、預覽、下載與狀態管理
 ├── README.md               # 使用、測試與部署說明
-├── vendor/
-│   ├── jszip.min.js        # 本地 ZIP 建立 library
-│   └── LICENSE-jszip.txt   # JSZip 授權
 └── tests/
     └── test-cases.md       # MVP 驗收測試矩陣
 ```
@@ -47,7 +43,7 @@ Line Sticker/
 - PNG 輸出與 1 MB 基本規格檢查。
 - Responsive 預覽網格，編號不會寫入下載圖片。
 - 單張 PNG 下載。
-- 全部 ZIP 下載。
+- 一鍵觸發全部 PNG 下載；儲存位置由手機瀏覽器與系統下載設定決定。若瀏覽器詢問是否允許多檔下載，請選擇允許。
 - 重新開始並清除瀏覽器暫存 Blob URL。
 - iPhone / Android 手機優先操作介面。
 - `Developer: Cutefish`。
@@ -105,7 +101,7 @@ STEP 2 的「一鍵複製專業生圖提示詞」會根據目前的貼圖數量�
 - 不需要橫向操作。
 - 圖片選擇器可以開啟相簿或檔案。
 - 8 / 16 / 24 / 40 張都可選。
-- ZIP 可以下載並解壓縮。
+- 一鍵下載會逐張觸發 PNG 下載；可在手機的瀏覽器下載清單或系統檔案 App 找到檔案。
 
 ## GitHub Pages 部署
 
@@ -131,7 +127,7 @@ Settings
 → Save
 ```
 
-此專案使用相對路徑載入 CSS、JS 與 JSZip，因此可直接作為 GitHub Pages project site。未來部署到 Netlify 時，不需修改圖片處理邏輯。
+此專案使用相對路徑載入 CSS 與 JS，因此可直接作為 GitHub Pages project site。未來部署到 Netlify 時，不需修改圖片處理邏輯。
 
 ## 雲端資料夾連結
 
@@ -145,7 +141,7 @@ const CLOUD_FOLDER_URL = "https://example.com/your-cloud-folder";
 
 ## 測試案例
 
-請依照 [`tests/test-cases.md`](tests/test-cases.md) 測試 8、16、24、40 張。每組應確認裁切數量、順序、PNG 尺寸、透明度、單張下載與 ZIP 解壓縮結果。
+請依照 [`tests/test-cases.md`](tests/test-cases.md) 測試 8、16、24、40 張。每組應確認裁切數量、順序、PNG 尺寸、透明度、單張下載與一鍵下載全部 PNG。
 
 ## 尚未實作
 

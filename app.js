@@ -78,7 +78,6 @@
     removeLightBackground: true,
     phraseLines: createPhraseLines(),
     stickers: [],
-    zipBlob: null,
     isProcessing: false
   };
 
@@ -99,6 +98,8 @@
     const ids = [
       "cloud-folder-link",
       "upload-zone",
+      "upload-zone-title",
+      "upload-zone-hint",
       "image-input",
       "file-status",
       "image-summary",
@@ -138,6 +139,7 @@
       "results-count",
       "sticker-grid",
       "download-all-button",
+      "download-all-label",
       "reset-button",
       "preview-dialog",
       "preview-title",
@@ -442,6 +444,7 @@
   async function handleFileUpload(file) {
     clearError();
     clearStickers();
+    setSourceWorkspaceState(false);
     elements.resultsSection.hidden = true;
     elements.imageSummary.hidden = true;
     elements.cropPreviewSection.hidden = true;
@@ -486,6 +489,7 @@
       updateBackgroundNote();
       elements.imageSummary.hidden = false;
       renderCropPreview();
+      setSourceWorkspaceState(true);
 
       updateRatioWarning();
       updateCropButton();
@@ -1172,9 +1176,9 @@
 
     const readyCount = state.stickers.length;
     elements.downloadAllButton.disabled = readyCount === 0 || state.isProcessing;
-    elements.downloadAllButton.textContent = readyCount
-      ? "下載 ZIP（" + readyCount + " 張 PNG）"
-      : "下載 ZIP（所有 PNG）";
+    elements.downloadAllLabel.textContent = readyCount
+      ? "下載全部 PNG（" + readyCount + " 張）"
+      : "下載全部 PNG";
   }
 
   function openPreview(index) {
@@ -1212,32 +1216,21 @@
     triggerDownload(sticker.blob, sticker.filename);
   }
 
-  async function downloadAllStickers() {
+  function downloadAllStickers() {
     if (!state.stickers.length || state.isProcessing) {
       return;
     }
 
-    if (!window.JSZip) {
-      showError("ZIP 元件尚未載入，請重新整理頁面後再試。", elements.errorMessage);
-      return;
-    }
-
     elements.downloadAllButton.disabled = true;
-    elements.downloadAllButton.textContent = "正在準備 ZIP…";
+    elements.downloadAllLabel.textContent = "正在下載 " + state.stickers.length + " 張 PNG…";
 
-    try {
-      const zip = new window.JSZip();
-      state.stickers.forEach(function (sticker) {
-        zip.file(sticker.filename, sticker.blob);
-      });
-      state.zipBlob = await zip.generateAsync({ type: "blob", compression: "STORE" });
-      triggerDownload(state.zipBlob, "LINE_Stickers_" + String(state.selectedCount).padStart(2, "0") + ".zip");
-    } catch (error) {
-      console.error(error);
-      showError("ZIP 建立失敗，請稍後再試。", elements.errorMessage);
-    } finally {
+    state.stickers.forEach(function (sticker) {
+      triggerDownload(sticker.blob, sticker.filename);
+    });
+
+    window.setTimeout(function () {
       updateDownloadAllButton();
-    }
+    }, 200);
   }
 
   function triggerDownload(blob, filename) {
@@ -1258,7 +1251,6 @@
     closePreview();
     clearStickers();
     resetSourceState();
-    state.zipBlob = null;
     state.isProcessing = false;
     state.phraseLines = createPhraseLines();
     elements.imageInput.value = "";
@@ -1300,6 +1292,15 @@
     elements.gridOffsetLabel.textContent = "可逐條拖曳格線調整邊界";
     elements.removeLightBackground.checked = true;
     elements.removeLightBackground.disabled = false;
+    setSourceWorkspaceState(false);
+  }
+
+  function setSourceWorkspaceState(hasSourceImage) {
+    document.body.classList.toggle("has-source-image", hasSourceImage);
+    elements.uploadZoneTitle.textContent = hasSourceImage ? "更換圖片" : "選擇圖片";
+    elements.uploadZoneHint.textContent = hasSourceImage
+      ? "選擇另一張規則排列的大圖"
+      : "拖曳檔案至此，或直接選取";
   }
 
   function removeSourceImage() {
@@ -1322,7 +1323,6 @@
       URL.revokeObjectURL(sticker.url);
     });
     state.stickers = [];
-    state.zipBlob = null;
     elements.stickerGrid.replaceChildren();
   }
 
