@@ -1,0 +1,169 @@
+# AI LINE Sticker Maker
+
+手機優先的純前端工具，將 AI 生成的 LINE 貼圖排列大圖，自動裁切成 PNG 並打包成 ZIP。
+
+## 技術架構
+
+- HTML
+- CSS
+- JavaScript
+- JSZip（本地 `vendor/jszip.min.js`）
+
+沒有 Python、Node.js backend、資料庫、登入系統、使用者帳號或圖片上傳 API。圖片會留在使用者的瀏覽器中處理。
+
+## 檔案結構
+
+```text
+Line Sticker/
+├── index.html              # 頁面結構與 UI
+├── style.css               # Mobile-first responsive styles
+├── app.js                  # 圖片處理、預覽、下載與狀態管理
+├── README.md               # 使用、測試與部署說明
+├── vendor/
+│   ├── jszip.min.js        # 本地 ZIP 建立 library
+│   └── LICENSE-jszip.txt   # JSZip 授權
+└── tests/
+    └── test-cases.md       # MVP 驗收測試矩陣
+```
+
+## 已完成功能
+
+- 支援 8、16、24、40 張貼圖。
+- 預設選擇 24 張，但核心使用可擴充的設定表。
+- 選擇數量時同步顯示建議整張圖片尺寸與 256 × 256 px 單格尺寸。
+- 依目前數量、網格與尺寸產生專業 AI 生圖 Prompt。
+- 可編輯每格貼圖文字，按鈕一鍵複製完整 Prompt；頁面不直接展開完整 Prompt。
+- Prompt 明確要求參考角色一致、每格一張、文字不跨格、無數字/編號/Logo/浮水印。
+- 支援 PNG、JPG、JPEG、WEBP。
+- 顯示原始尺寸、檔案大小、透明背景與網格資訊。
+- 根據網格比例檢查圖片是否可能選錯數量。
+- 上傳後顯示裁切預覽網格，可在手機上逐條拖曳 X/Y 格線與邊界並重設對齊。
+- 左至右、由上至下自動裁切。
+- Cell 安全邊界，避免相鄰貼圖互相重疊。
+- 透明 PNG 的 alpha Trim 與 10 px 安全邊距。
+- 不透明圖片預設開啟「移除近白背景」，只移除從圖片邊緣連通的近白區域；使用者可以手動關閉以保留白底。
+- 透明 PNG 仍以 alpha channel 判斷背景，不會把白色內容當成透明。
+- 等比例縮放至最大 370 × 320 px。
+- PNG 輸出與 1 MB 基本規格檢查。
+- Responsive 預覽網格，編號不會寫入下載圖片。
+- 單張 PNG 下載。
+- 全部 ZIP 下載。
+- 重新開始並清除瀏覽器暫存 Blob URL。
+- iPhone / Android 手機優先操作介面。
+- `Developer: Cutefish`。
+- 單一雲端資料夾入口。
+
+## 本機測試
+
+最簡單的方式是直接用瀏覽器開啟 `index.html`。若要模擬 GitHub Pages 的靜態伺服器路徑，可在專案資料夾執行任一個現有的靜態伺服器工具；這個專案不需要安裝 Python 或 Node.js 才能運作。
+
+例如有 Node.js 時可以使用：
+
+```bash
+npx serve .
+```
+
+也可以直接將整個資料夾拖入瀏覽器測試基本上傳與裁切流程。
+
+## 建議 AI 大圖尺寸
+
+建議以每格 256 × 256 px 生成規則網格：
+
+| 貼圖數量 | 網格 | 建議整張圖片 | 每個格子 |
+| ---: | ---: | ---: | ---: |
+| 8 | 4 × 2 | 1024 × 512 px | 256 × 256 px |
+| 16 | 4 × 4 | 1024 × 1024 px | 256 × 256 px |
+| 24 | 4 × 6 | 1024 × 1536 px | 256 × 256 px |
+| 40 | 5 × 8 | 1280 × 2048 px | 256 × 256 px |
+
+相同比例的其他高解析度尺寸也能裁切。不透明圖片預設會移除從圖片邊緣連通的近白背景，再執行透明 Trim；若要保留白底，可在圖片資訊區關閉「移除近白背景」。來源本身具有透明 alpha 時，網站會保留 alpha 並執行透明 Trim。
+
+## AI Prompt Generator
+
+STEP 2 的「一鍵複製專業生圖提示詞」會根據目前的貼圖數量自動產生 Prompt：
+
+- 8 張會使用 8 句文字與 4 × 2 規格。
+- 16 張會使用 16 句文字與 4 × 4 規格。
+- 24 張會使用 24 句文字與 4 × 6 規格。
+- 40 張會要求 40 句文字與 5 × 8 規格；預設文字不足時，先補完文字欄位再複製。
+
+每行是一句貼圖文字，可以直接修改。Prompt 會要求 AI 使用附上的角色參考圖、保持角色完全一致、每格完整留在自己的格子內，並禁止把數字、編號、Logo、浮水印或格線畫進成品。
+
+## 手機測試
+
+### 方法 A：GitHub Pages
+
+推送後直接用 iPhone Safari 或 Android Chrome 開啟 GitHub Pages 網址。
+
+### 方法 B：同一 Wi-Fi 區網
+
+使用電腦啟動一個靜態伺服器，讓手機與電腦連到同一個 Wi-Fi，再用電腦區網 IP 開啟網站。
+
+測試重點：
+
+- 不需要縮放。
+- 不需要橫向操作。
+- 圖片選擇器可以開啟相簿或檔案。
+- 8 / 16 / 24 / 40 張都可選。
+- ZIP 可以下載並解壓縮。
+
+## GitHub Pages 部署
+
+在 `Line Sticker` 資料夾執行：
+
+```bash
+git init
+git add .
+git commit -m "Initial AI LINE Sticker Maker MVP"
+git branch -M main
+git remote add origin <GitHub repository URL>
+git push -u origin main
+```
+
+在 GitHub repository 設定：
+
+```text
+Settings
+→ Pages
+→ Build and deployment: Deploy from a branch
+→ Branch: main
+→ Folder: / (root)
+→ Save
+```
+
+此專案使用相對路徑載入 CSS、JS 與 JSZip，因此可直接作為 GitHub Pages project site。未來部署到 Netlify 時，不需修改圖片處理邏輯。
+
+## 雲端資料夾連結
+
+目前首頁的雲端連結由 `app.js` 的單一設定值控制：
+
+```js
+const CLOUD_FOLDER_URL = "https://example.com/your-cloud-folder";
+```
+
+將它替換成實際的 Google Drive、Dropbox 或其他資料夾網址即可。網站只會開啟該連結，不會讀取、同步或上傳資料夾內容。
+
+## 測試案例
+
+請依照 [`tests/test-cases.md`](tests/test-cases.md) 測試 8、16、24、40 張。每組應確認裁切數量、順序、PNG 尺寸、透明度、單張下載與 ZIP 解壓縮結果。
+
+## 尚未實作
+
+- AI 生圖。
+- LINE Main Image（240 × 240 px）。
+- LINE Tab Icon（96 × 74 px）。
+- 自動讀取雲端資料夾檔案。
+- 登入、帳號、資料庫、付款。
+- 不規則網格的自動校正。
+
+## 已知限制
+
+- AI 生成的大圖必須是規則網格排列，貼圖不要跨越格線。
+- 目前的比例檢查只驗證整張圖片的寬高比，不能可靠辨識內部實際欄列；例如 1024×1536 的 5×6 圖片仍可能通過 24 張（4×6）的外框比例檢查。使用前必須確認 AI 實際生成的欄列數與目前選擇一致。
+- 若 AI 生成的角色、文字或道具跨越格線，1px 安全邊界只能縮小裁切範圍，不能修復已經跨格的內容。生成 Prompt 必須明確要求每格內縮、格線附近保留空白。
+- 不透明圖片預設會執行近白背景移除；這是為了符合目前白底 AI 貼圖大圖的使用情境，也提供 checkbox 讓使用者關閉。
+- 手動格線可逐條調整，並限制相鄰格至少保留 32 px；若來源實際欄列數錯誤（例如 5×6 圖片選成 4×6），調整格線不能把錯誤網格變成正確網格。
+- 近白背景移除雖然預設開啟，但不是完美去背；與背景連通的近白色衣服、文字或裝飾可能被移除。使用者可關閉此選項，並應先用預覽與單張下載檢查。
+- PNG 超過 1 MB 時會重新編碼並警告，但不保證每張圖都能壓到限制以下。
+- 圖片比例明顯不符合目前網格時，裁切會先停止，要求使用者確認數量。
+- GitHub Pages 是靜態主機，所有處理均在瀏覽器執行。

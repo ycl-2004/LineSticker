@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f4f1" />
+    <meta name="description" content="在裝置上將 LINE 貼圖大圖裁切成 PNG 與 ZIP。" />
+    <title>LINE Sticker Cutter</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="vendor/jszip.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="#workspace" aria-label="LINE Sticker Cutter 首頁">
+          <span class="brand-mark" aria-hidden="true">✂</span>
+          <span class="brand-copy"><span>LINE Sticker Cutter</span><small>把大圖變成一組可愛貼圖</small></span>
+        </a>
+        <div class="header-status"><span aria-hidden="true"></span>只在這台裝置處理</div>
+      </header>
+
+      <section class="workspace" id="workspace" aria-labelledby="workspace-title">
+        <div class="workspace-heading">
+          <div class="workspace-title">
+            <p class="overline">STICKER WORKBENCH</p>
+            <h1 id="workspace-title">把一張大圖，<em>拆成貼圖。</em></h1>
+          </div>
+          <div class="hero-guide" aria-label="支援格式與操作提示">
+            <span class="hero-guide-mark" aria-hidden="true">✦</span>
+            <p><strong>PNG · JPG · WEBP</strong><span>選好大圖，就能開始裁切</span></p>
+          </div>
+        </div>
+
+        <div class="workflow" aria-label="貼圖裁切工作區">
+          <section class="panel upload-panel" aria-labelledby="upload-title">
+            <div class="panel-heading source-heading">
+              <span class="panel-index" aria-hidden="true">✦</span>
+              <div class="source-heading-copy"><p class="overline">SOURCE · 01</p><h2 id="upload-title">上傳貼圖大圖</h2></div>
+            </div>
+            <p class="section-helper">從你的相簿或資料夾選一張規則排列的大圖。</p>
+            <label class="upload-zone" id="upload-zone" for="image-input">
+              <span class="upload-icon" aria-hidden="true">＋</span>
+              <span class="upload-title">選擇圖片</span>
+              <span class="upload-hint">拖曳檔案至此，或直接選取</span>
+              <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" />
+            </label>
+            <p class="file-status" id="file-status" role="status">尚未選擇圖片</p>
+
+            <div class="image-summary" id="image-summary" hidden>
+              <div class="source-file-row">
+                <img class="source-thumbnail" id="source-thumbnail" alt="已上傳的貼圖大圖縮圖" />
+                <div class="source-file-copy">
+                  <p class="source-file-name"><span id="source-file-name">—</span><span class="ready-check" aria-hidden="true">✓</span></p>
+                  <p class="source-meta-line"><span id="source-dimensions">—</span><span class="meta-dot" aria-hidden="true">·</span><span id="source-file-size">—</span></p>
+                </div>
+                <button class="icon-trash-button" id="remove-image-button" type="button" aria-label="移除已上傳的圖片">×</button>
+              </div>
+              <p class="source-secondary-line">透明背景：<span id="source-transparency">—</span><span class="meta-dot" aria-hidden="true">·</span>目前網格：<span id="source-grid">—</span></p>
+              <p class="inline-note" id="background-note"></p>
+              <label class="background-option" for="remove-light-background">
+                <input id="remove-light-background" type="checkbox" checked />
+                <span><strong>移除近白背景</strong><small>只移除圖片邊緣連通的近白區域。</small></span>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel config-panel" aria-labelledby="config-title">
+            <div class="panel-heading">
+              <span class="panel-index" aria-hidden="true">◎</span>
+              <div><p class="overline">GRID</p><h2 id="config-title">這次要幾張？</h2></div>
+            </div>
+            <fieldset class="count-options">
+              <legend class="sr-only">貼圖數量</legend>
+              <label class="count-option"><input type="radio" name="sticker-count" value="8" /><span>8</span></label>
+              <label class="count-option"><input type="radio" name="sticker-count" value="16" /><span>16</span></label>
+              <label class="count-option is-selected"><input type="radio" name="sticker-count" value="24" checked /><span>24</span></label>
+              <label class="count-option"><input type="radio" name="sticker-count" value="40" /><span>40</span></label>
+            </fieldset>
+            <div class="grid-summary" aria-live="polite">
+              <div><span class="summary-label">貼圖數量</span><strong id="selected-count">24 張</strong></div>
+              <div><span class="summary-label">排列方式</span><strong id="selected-grid">4 × 6</strong></div>
+              <div><span class="summary-label">建議比例</span><strong id="selected-ratio">4:6</strong></div>
+            </div>
+            <div class="size-guide" aria-live="polite">
+              <span class="summary-label">建議來源尺寸</span>
+              <strong id="recommended-image-size">1024 × 1536 px</strong>
+              <span class="size-divider" aria-hidden="true"></span>
+              <span class="summary-label">單格</span>
+              <strong id="recommended-cell-size">256 × 256 px</strong>
+            </div>
+            <details class="prompt-builder" open>
+              <summary class="prompt-builder-header">
+                <div><p class="overline">AI PROMPT</p><h3 id="prompt-builder-title">貼圖文字</h3></div>
+                <span class="prompt-toggle"><span class="prompt-spec" id="prompt-spec">24 張 · 4 × 6</span><span aria-hidden="true">⌄</span></span>
+              </summary>
+              <div class="prompt-content">
+                <label class="prompt-label" for="sticker-phrases">每行一則貼圖文字</label>
+                <textarea id="sticker-phrases" class="prompt-phrases" rows="7" spellcheck="false"></textarea>
+                <div class="prompt-footer"><span class="prompt-count" id="prompt-count">已填 24 / 24 句</span><button class="prompt-copy-button" id="copy-prompt-button" type="button">複製 AI 提示詞 <span aria-hidden="true">↗</span></button></div>
+                <p class="prompt-status" id="prompt-status" role="status" hidden></p>
+                <textarea id="generated-prompt" class="sr-only" aria-hidden="true" tabindex="-1" readonly></textarea>
+              </div>
+            </details>
+            <div class="ratio-warning" id="ratio-warning" role="alert" hidden></div>
+          </section>
+
+          <section class="crop-preview-section" id="crop-preview-section" aria-labelledby="crop-preview-title" hidden>
+            <div class="preview-heading">
+              <div><p class="overline">ALIGNMENT</p><h2 id="crop-preview-title">調整裁切格線</h2></div>
+              <span class="preview-grid-badge" id="preview-grid-badge">4 × 6</span>
+            </div>
+            <div class="source-preview-frame checkerboard"><canvas id="crop-preview-canvas" aria-label="原始圖片與裁切網格預覽"></canvas></div>
+            <div class="grid-controls"><span id="grid-offset-label">可逐條拖曳格線調整邊界</span><button class="grid-reset-button" id="reset-grid-button" type="button">重設格線</button></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="export-bar" aria-label="裁切操作">
+        <div><p class="overline">READY WHEN YOU ARE</p><strong>確認格線，讓貼圖出發</strong></div>
+        <button class="primary-button" id="crop-button" type="button" disabled>開始裁切 <span aria-hidden="true">→</span></button>
+        <div class="progress-panel" id="progress-panel" hidden><div class="progress-label"><span id="progress-text">準備中…</span><span id="progress-count">0 / 0</span></div><div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div></div>
+        <p class="error-message" id="error-message" role="alert" hidden></p>
+      </section>
+
+      <section class="results-section" id="results-section" aria-labelledby="results-title" hidden>
+        <div class="results-header"><div><p class="overline">ALL SET</p><h2 id="results-title">小可愛們準備好了！</h2><p class="results-count" id="results-count" aria-live="polite">已完成 0 / 0 張</p></div><span class="success-badge">✓ READY</span></div>
+        <div class="sticker-grid" id="sticker-grid" role="list" aria-label="裁切結果"></div>
+        <div class="download-actions"><button class="primary-button" id="download-all-button" type="button" disabled>下載 ZIP（所有 PNG） <span aria-hidden="true">↓</span></button><button class="secondary-button" id="reset-button" type="button">再做一組 <span aria-hidden="true">↻</span></button></div>
+      </section>
+
+      <section class="utility-row" aria-label="輔助工具">
+        <div class="cloud-dock">
+          <span class="cloud-dock-mark" aria-hidden="true">☁</span>
+          <div><p>做完要放哪裡？</p><a class="cloud-link" id="cloud-folder-link" href="https://example.com/your-cloud-folder" target="_blank" rel="noopener noreferrer">開啟我的雲端資料夾 <span aria-hidden="true">↗</span></a></div>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true">●</span> 圖片只在這台裝置處理</p>
+      </section>
+      <footer class="site-footer">LINE Sticker Cutter <span aria-hidden="true">/</span> Cutefish</footer>
+    </main>
+
+    <dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-title">
+      <div class="dialog-inner"><div class="dialog-header"><h2 id="preview-title">貼圖預覽</h2><button class="icon-button" id="close-preview-button" type="button" aria-label="關閉預覽">×</button></div><div class="dialog-image-wrap checkerboard"><img id="preview-image" alt="貼圖預覽" /></div></div>
+    </dialog>
+  </body>
+</html>
