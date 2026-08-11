@@ -104,10 +104,16 @@ h2 { font-size: 1.14rem; font-weight: 850; line-height: 1.13; }
 .preview-title-copy { align-items: center; }
 .preview-title-copy .overline { margin-bottom: 3px; }
 .preview-grid-badge, .prompt-spec, .success-badge { padding: 4px 7px; border-radius: 999px; color: var(--mint-strong); background: var(--mint); font-family: var(--font-mono); font-size: .65rem; font-weight: 700; white-space: nowrap; }
-.source-preview-frame { overflow: hidden; border: 1px solid var(--line-strong); border-radius: 14px; background-color: var(--paper); }
+.source-preview-frame { position: relative; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 14px; background-color: var(--paper); }
+.source-preview-frame::before { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 5px 8px; border: 2px solid #fffdf9; border-radius: 7px; color: #fffdf9; background: var(--berry); box-shadow: 0 2px 0 rgba(41, 39, 36, .18); content: "最終裁切外框"; font-family: var(--font-mono); font-size: .62rem; font-weight: 800; letter-spacing: .02em; line-height: 1; pointer-events: none; }
 .source-preview-frame canvas { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: none; user-select: none; }
 .source-preview-frame canvas[data-dragging="true"] { cursor: grabbing; }
 .grid-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--muted); font-size: .67rem; font-weight: 700; line-height: 1.35; }
+.grid-control-copy { display: grid; gap: 5px; min-width: 0; }
+.grid-legend { display: inline-flex; flex-wrap: wrap; gap: 8px; color: var(--quiet); font-size: .6rem; font-weight: 700; }
+.grid-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.grid-key { display: inline-block; width: 20px; border-top: 5px solid var(--berry); box-shadow: 0 0 0 2px rgba(201, 87, 91, .18); }
+.grid-key--inner { border-top: 4px dashed #0c565a; box-shadow: 0 0 0 2px rgba(255, 253, 249, .92); }
 
 .count-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 0 0 13px; padding: 0; border: 0; }
 .count-option { position: relative; display: grid; min-height: 50px; place-items: center; border: 1px solid transparent; border-radius: 12px; color: var(--muted); background: rgba(255, 253, 249, .58); font-family: var(--font-mono); font-size: 1.1rem; font-weight: 800; transition: background 160ms ease, color 160ms ease, transform 160ms ease; }

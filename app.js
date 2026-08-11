@@ -2,7 +2,7 @@
   "use strict";
 
   const STICKER_CONFIGS = Object.freeze({
-    8: Object.freeze({ columns: 4, rows: 2, imageWidth: 1024, imageHeight: 512, cellSize: 256 }),
+    8: Object.freeze({ columns: 2, rows: 4, imageWidth: 512, imageHeight: 1024, cellSize: 256 }),
     16: Object.freeze({ columns: 4, rows: 4, imageWidth: 1024, imageHeight: 1024, cellSize: 256 }),
     24: Object.freeze({ columns: 4, rows: 6, imageWidth: 1024, imageHeight: 1536, cellSize: 256 }),
     40: Object.freeze({ columns: 5, rows: 8, imageWidth: 1280, imageHeight: 2048, cellSize: 256 })
@@ -364,6 +364,8 @@
     }
   }
 
+  // Prompt 的固定文案集中在这里；尺寸、网格、张数与用户填写的文字会在执行时自动插入。
+  // 若要调整 AI 的角色、版面、视觉风格或禁止项目，直接编辑下方 return 数组中的对应文字即可。
   function buildAIPrompt() {
     const config = getGridConfig(state.selectedCount);
     const sourceSpec = getSourceImageSpec(state.selectedCount);
@@ -651,15 +653,15 @@
     elements.ratioWarning.textContent =
       "⚠️ 目前選擇 " +
       state.selectedCount +
-      " 張（" +
+      " 張需要 " +
       validation.config.columns +
       " × " +
       validation.config.rows +
-      "），但圖片比例似乎不符合 " +
-      validation.config.columns +
-      ":" +
-      validation.config.rows +
-      "，請確認是否選錯貼圖數量。";
+      "（外框比例 " +
+      formatRatio(validation.expectedRatio) +
+      "），但來源外框約為 " +
+      formatRatio(validation.actualRatio) +
+      "。這個檢查只比對整張圖片寬高，無法辨識圖片內是否真的有對應的格數；請改選正確張數或換成同樣比例的大圖。";
     elements.ratioWarning.hidden = false;
   }
 
@@ -675,6 +677,13 @@
       expectedRatio: expectedRatio,
       config: config
     };
+  }
+
+  function formatRatio(value) {
+    if (value >= 1) {
+      return value.toFixed(2) + ":1";
+    }
+    return "1:" + (1 / value).toFixed(2);
   }
 
   function isLowResolution(canvas, count) {
@@ -737,7 +746,7 @@
   function renderCropPreview() {
     if (!state.sourceCanvas) {
       elements.cropPreviewSection.hidden = true;
-      elements.gridOffsetLabel.textContent = "可逐條拖曳格線調整邊界";
+      elements.gridOffsetLabel.textContent = "紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。";
       return;
     }
 
@@ -754,18 +763,46 @@
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(state.sourceCanvas, 0, 0);
 
+    const shortestSide = Math.min(canvas.width, canvas.height);
+    const innerLineWidth = Math.max(4, Math.round(shortestSide / 230));
+    const innerLineHaloWidth = innerLineWidth + Math.max(5, Math.round(shortestSide / 300));
+    const outerBandWidth = Math.max(14, Math.round(shortestSide / 60));
+    const outerLineWidth = Math.max(7, Math.round(shortestSide / 145));
+    const outerLineHaloWidth = outerLineWidth + Math.max(6, Math.round(shortestSide / 220));
+    const handleRadius = Math.max(10, Math.round(shortestSide / 52));
+    const handleOffset = handleRadius + 5;
+
     context.save();
-    context.strokeStyle = "rgba(25, 93, 94, 0.9)";
-    context.lineWidth = Math.max(2, Math.round(Math.min(canvas.width, canvas.height) / 320));
-    context.setLineDash([10, 10]);
-    for (let column = 0; column <= config.columns; column += 1) {
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = "rgba(255, 253, 249, 0.9)";
+    context.lineWidth = innerLineHaloWidth;
+    context.setLineDash([18, 12]);
+    for (let column = 1; column < config.columns; column += 1) {
       const x = Math.round(linesX[column]);
       context.beginPath();
       context.moveTo(x, 0);
       context.lineTo(x, canvas.height);
       context.stroke();
     }
-    for (let row = 0; row <= config.rows; row += 1) {
+    for (let row = 1; row < config.rows; row += 1) {
+      const y = Math.round(linesY[row]);
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(canvas.width, y);
+      context.stroke();
+    }
+    context.strokeStyle = "rgba(12, 86, 90, 1)";
+    context.lineWidth = innerLineWidth;
+    context.setLineDash([18, 12]);
+    for (let column = 1; column < config.columns; column += 1) {
+      const x = Math.round(linesX[column]);
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+    }
+    for (let row = 1; row < config.rows; row += 1) {
       const y = Math.round(linesY[row]);
       context.beginPath();
       context.moveTo(0, y);
@@ -775,25 +812,43 @@
     context.restore();
 
     context.save();
-    context.fillStyle = "rgba(232, 111, 81, 0.96)";
+    context.strokeStyle = "rgba(201, 87, 91, 0.24)";
+    context.lineWidth = outerBandWidth;
+    context.setLineDash([]);
+    context.strokeRect(outerBandWidth / 2, outerBandWidth / 2, canvas.width - outerBandWidth, canvas.height - outerBandWidth);
+    context.strokeStyle = "rgba(255, 253, 249, 0.96)";
+    context.lineWidth = outerLineHaloWidth;
+    context.strokeRect(outerLineHaloWidth / 2, outerLineHaloWidth / 2, canvas.width - outerLineHaloWidth, canvas.height - outerLineHaloWidth);
+    context.strokeStyle = "rgba(184, 65, 70, 1)";
+    context.lineWidth = outerLineWidth;
+    context.setLineDash([]);
+    context.strokeRect(outerLineWidth / 2, outerLineWidth / 2, canvas.width - outerLineWidth, canvas.height - outerLineWidth);
     for (let column = 1; column < config.columns; column += 1) {
-      drawGridHandle(context, linesX[column], 12);
+      drawGridHandle(context, linesX[column], handleOffset, handleRadius);
     }
     for (let row = 1; row < config.rows; row += 1) {
-      drawGridHandle(context, 12, linesY[row]);
+      drawGridHandle(context, handleOffset, linesY[row], handleRadius);
     }
     context.restore();
 
     elements.previewGridBadge.textContent = config.columns + " × " + config.rows;
     elements.gridOffsetLabel.textContent = state.activeGridLineLabel ||
-      "可逐條拖曳格線調整邊界・最小格寬／高 " + MIN_GRID_CELL_SIZE + " px";
+      "紅色實線可調整圖片外框；拖曳青色虛線或橘色點調整內部格線・最小格寬／高 " + MIN_GRID_CELL_SIZE + " px";
     elements.cropPreviewSection.hidden = false;
   }
 
   function drawGridHandle(context, x, y, radius) {
+    context.fillStyle = "rgba(255, 253, 249, 0.96)";
+    context.beginPath();
+    context.arc(x, y, radius + 5, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "rgba(255, 184, 102, 1)";
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
     context.fill();
+    context.strokeStyle = "rgba(184, 65, 70, 1)";
+    context.lineWidth = Math.max(2, Math.round(radius / 4));
+    context.stroke();
   }
 
   function resetGridPosition() {
@@ -816,7 +871,7 @@
     const point = getGridPointerPosition(event);
     const target = findClosestGridLine(point);
     if (!target) {
-      state.activeGridLineLabel = "請拖曳深青色格線調整邊界";
+      state.activeGridLineLabel = "請拖曳青色虛線或橘色拖曳點調整格線";
       renderCropPreview();
       return;
     }
@@ -941,7 +996,12 @@
   }
 
   function getGridLineLabel(target) {
-    return "正在調整第 " + (target.index + 1) + " 條" + (target.axis === "x" ? "垂直" : "水平") + "格線";
+    const lines = target.axis === "x" ? state.gridLinesX : state.gridLinesY;
+    const direction = target.axis === "x" ? "垂直" : "水平";
+    if (target.index === 0 || target.index === lines.length - 1) {
+      return "正在調整圖片 " + direction + "外框";
+    }
+    return "正在調整第 " + target.index + " 條" + direction + "格線";
   }
 
   function clampGridLine(value, minimum, maximum) {
@@ -1409,7 +1469,7 @@
     elements.sourceTransparency.textContent = "—";
     elements.sourceGrid.textContent = "—";
     elements.backgroundNote.textContent = "";
-    elements.gridOffsetLabel.textContent = "可逐條拖曳格線調整邊界";
+    elements.gridOffsetLabel.textContent = "紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。";
     elements.removeLightBackground.checked = true;
     elements.removeLightBackground.disabled = false;
     setSourceWorkspaceState(false);

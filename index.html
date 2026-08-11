@@ -173,8 +173,11 @@
               ></canvas>
             </div>
             <div class="grid-controls">
-              <span id="grid-offset-label">可逐條拖曳格線調整邊界</span
-              ><button
+              <div class="grid-control-copy">
+                <span id="grid-offset-label">紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。</span>
+                <span class="grid-legend" aria-hidden="true"><span><i class="grid-key grid-key--outer"></i>外框</span><span><i class="grid-key grid-key--inner"></i>可調格線</span></span>
+              </div>
+              <button
                 class="grid-reset-button"
                 id="reset-grid-button"
                 type="button"
