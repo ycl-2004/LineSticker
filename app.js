@@ -75,7 +75,7 @@
   const MIN_GRID_CELL_SIZE = 32;
   const GRID_LINE_HIT_DISTANCE = 18;
   const WHITE_BACKGROUND_THRESHOLD = 245;
-  const CLOUD_FOLDER_URL = "https://example.com/your-cloud-folder";
+  const CLOUD_FOLDER_URL = "https://docs.google.com/document/d/13Cl-Zr3Vk99Xa7McNSn-I8WwA6MdVRkHs1YmG45oulQ/edit";
 
   const state = {
     selectedCount: DEFAULT_STICKER_COUNT,
