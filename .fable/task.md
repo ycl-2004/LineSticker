@@ -193,3 +193,129 @@
 - `node --check app.js`、`git diff --check` 通过。
 - ego-browser 390px：透明 2 × 4 测试图完成 `8 / 8` 张，主按钮显示「下載 ZIP（8 張 PNG）」。
 - 实际点击 ZIP 后取得 `application/zip`、44,208 bytes；local-file 签名为 `0x04034b50`、中央目录结束签名为 `0x06054b50`，中央目录有 8 项：`sticker_01.png` 至 `sticker_08.png`。
+
+---
+
+# LINE Sticker Cutter — Customer-ready audit (analysis phase)
+
+## Goal
+
+在不先改动现有功能的前提下，审查当前 LINE Sticker Cutter 是否适合直接面向用户交付，并整理视觉、交互、功能、性能、可访问性与交付包的优化优先级。
+
+## Acceptance criteria
+
+- [x] 读取当前项目规则、README、HTML、CSS、JavaScript 与测试案例。
+- [x] 在桌面、390px 手机与 320px 极窄视口检查实际布局与横向溢出。
+- [x] 使用真实 v1 大图跑通上传、网格预览、裁切与 24 张结果生成。
+- [x] 使用真实 v2 大图确认当前“只检查外框比例”的已知限制仍存在。
+- [x] 运行 `node --check app.js` 与 `git diff --check`。
+- [ ] 根据用户确认实施优化并重新验证。
+
+## Requirements (append-only)
+
+1. 先完整分析当前 app 可优化的视觉、使用流程与功能点。
+2. 以面向用户、可以直接交付为目标提出改造建议。
+3. 识别并规划需要移除的多余解释、开发文档与非客户交付内容。
+4. 本阶段先给建议，不提前改动产品代码。
+
+## Decision log
+
+- 2026-08-12：本阶段范围限定为审查与建议；不删除 `.fable`、`template`、测试或其他文件，不覆盖工作区已有修改。
+- 2026-08-12：以实际 DOM、截图、真实 v1/v2 上传结果和静态检查为证据，不把 README 的描述直接当成运行事实。
+- 2026-08-12：初步发布门槛为：首屏能让新用户完成下一步、结果页能快速下载、客户包不暴露私有云端入口与内部开发资料。
+
+## Evidence
+
+- 当前项目是纯静态 `index.html`、`style.css`、`app.js`，无构建步骤；工作区另有 `template/`、`tests/` 与 `.fable/` 内部资料。
+- 390px 与 320px 视口实测 `scrollWidth === clientWidth`，未发现横向溢出；桌面 1512px 视口也未发现横向溢出。
+- v1 实测显示 `1,024 × 1,536 px`、`4 × 6`、24 个结果、`已完成 24 / 24 張`，首张结果 `231 × 220 px` 且显示符合基本规格。
+- v1 上传后手机 `scrollY=0`，裁切预览占据首屏，数量／输出配置在其后；当前没有上传完成后自动引导到配置区的行为。
+- v2 实测同为 `1,024 × 1,536 px` 时不出现比例警告，印证代码只能校验整张图片宽高比，不能识别内部真实列行。
+- 当前 UI 与代码仍包含面向开发者或所有者的 Google Docs “我的云端资料夹”入口；该链接并非应用内部真正的用户云端存储。
+
+# LINE Sticker Cutter — README Refresh and Publish
+
+## Goal
+
+让 README 准确反映当前应用的真实功能、使用流程、限制与部署方式，并将文档及 Google 文件链接修正发布到 GitHub。
+
+## Acceptance criteria
+
+- [x] README 中的功能、网格规格、导出模式、操作流程与当前代码一致。
+- [x] README 不再包含过时、重复或与实际 UI 不符的说明。
+- [x] Google 文件链接在应用与 README 中一致，旧占位链接完全移除。
+- [x] 相关静态检查通过，并仅提交本任务范围内的文件。
+- [ ] 变更成功推送到 GitHub，或明确记录身份验证阻塞。
+
+## Requirements (append-only)
+
+1. 将 README 更新为与当前应用一致。
+2. 更新后把变更推送到 GitHub。
+3. 保留并发布先前指定的 Google 文件链接修正。
+
+## Decision log
+
+- 2026-08-12：以 `index.html`、`app.js` 与现有测试案例为事实来源；README 只记录已实现且可观察的功能。
+- 2026-08-12：发布范围限定为 `README.md`、`app.js`、`index.html`；不纳入无关的 `.DS_Store` 与未跟踪 `.gitignore`。
+- 2026-08-12：`gh auth status` 显示 `ycl-2004` token 无效；改用现有 SSH key 进行 Git 发布。
+- 2026-08-12：按 GitHub 发布流程创建 `agent/readme-cloud-link` 分支并提交 `ed4dae8`；Codex 非交互环境的 SSH agent 没有加载 `id_ed25519`，push 需由用户在本机输入 SSH key passphrase 后完成。
+
+## Evidence
+
+- `README.md` 已以 `app.js`／`index.html` 为事实来源重写；修正最明显的过时说明：批量下载现在是本机生成 ZIP，而非逐张触发下载。
+- 一致性检查确认 Google 文件 URL 同时存在于 README、`app.js` 与 `index.html`，旧 `example.com` 占位链接为 0 处。
+- `node --check app.js`、`git diff --check` 通过；README 的 4 个本地 Markdown 链接全部存在。
+- 默认贴图文字实际为 40 句且没有空值；README 已据此修正旧的「40 张预设不足」说法。
+- `git status` 确认提交只包含 `README.md`、`app.js`、`index.html`；`.fable`、`.DS_Store`、`.gitignore` 未纳入提交。
+- 用户终端的 `ssh -T git@github.com` 已返回 `Hi ycl-2004!`，说明 SSH key 与 GitHub 账号绑定成功。
+- 已创建 commit `ed4dae8 Refresh README and cloud document link`；push 因非交互环境没有 SSH agent identity 而失败，待用户本机执行 `git push -u origin agent/readme-cloud-link`。
+
+---
+
+# LINE Sticker Cutter — Customer-ready flow implementation
+
+## Goal
+
+在新分支 `feat/customer-ready-flow` 上，将客户确认的用户流程与结果呈现优化落地；保留现有裁切算法与 Google Docs 入口。
+
+## Acceptance criteria
+
+- [x] 新分支已建立。
+- [x] 上传后流程按「张数与排列 → 确认裁切范围 → 开始裁切」组织。
+- [x] ZIP 下载按钮移动到结果标题旁边。
+- [x] 底部 CTA 会依未上传、已上传、比例错误、处理中与已完成状态动态更新。
+- [x] 网格、图片比例与输出文案已统一并压缩过长说明。
+- [x] 移动端小按钮与图标按钮扩大到可触控尺寸。
+- [x] 结果卡片增加文件名、像素尺寸与合规状态。
+- [x] 现有裁切、去背、Trim、Resize 与 ZIP 算法未重写。
+- [x] Google Docs 入口与原 URL 保留在页面底部。
+- [x] 完成全部视口与下载回归验证。
+
+## Requirements (append-only)
+
+1. 重新整理上传后的用户路径。
+2. 把 ZIP 下载移到结果标题旁边。
+3. 动态更新底部 CTA。
+4. 统一比例、网格和输出文案。
+5. 压缩过多解释文字。
+6. 放大移动端小按钮。
+7. 结果卡片增加文件名和合规状态。
+8. 保留现有裁切算法，不做大规模重构。
+9. 保留私人 Google Docs 入口，不删除、不移动。
+
+## Decision log
+
+- 2026-08-12：客户更正此前建议，Google Docs 入口是需要保留的产品入口；本次不删除、不移动、不更换链接。
+- 2026-08-12：采用 CSS workflow order 调整上传后的显示顺序，避免改动既有 DOM 事件绑定与裁切算法。
+- 2026-08-12：合规状态沿用既有尺寸与文件大小校验，只更新用户可读标签为「可用於 LINE」或「非 LINE 上架檔」。
+
+## Evidence
+
+- `node --check app.js` 与 `git diff --check` 已通过。
+- 390px 真实 v1 图片验证：上传后 `張數與排列` 位于 `確認裁切範圍` 之前；CTA 显示「確認網格並裁切 24 張」且可用。
+- 390px 真实 v1 图片验证：裁切完成 `24 / 24`，结果标题旁显示「下載 ZIP（24 張 PNG）」；首张显示 `sticker_01.png`、`231 × 220 px`、`✓ 可用於 LINE`。
+- 真实 DOM 验证 Google Docs href 仍为原 `docs.google.com/document/...` 链接；390px 横向溢出检查通过。
+- 320px、390px、768px、1024px 与 1440px 视口均通过横向溢出检查；移动端重置按钮为 `84 × 44`，图标按钮为 `44 × 44`。
+- 最终浏览器回归：真实 v1 图片完成 `24` 张裁切；ZIP 位于 `.results-header-actions`；重置后结果隐藏、CTA 恢复为「先上傳圖片」，Google Docs URL 未改变。
+
+---

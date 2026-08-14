@@ -46,7 +46,7 @@
       >
         <div class="workspace-heading">
           <div class="workspace-title">
-            <p class="overline">STICKER WORKBENCH</p>
+            <p class="overline">貼圖裁切工具</p>
             <h1 id="workspace-title">把一張大圖，<em>拆成貼圖。</em></h1>
           </div>
           <div class="hero-guide" aria-label="支援格式與操作提示">
@@ -68,7 +68,7 @@
                   <path d="M12 16V4m0 0-4 4m4-4 4 4M5 15v4h14v-4" /></svg
               ></span>
               <div class="source-heading-copy">
-                <p class="overline">SOURCE</p>
+                <p class="overline">上傳圖片</p>
                 <h2 id="upload-title">上傳貼圖大圖</h2>
               </div>
             </div>
@@ -131,9 +131,10 @@
               <p class="source-secondary-line">
                 透明背景：<span id="source-transparency">—</span
                 ><span class="meta-dot" aria-hidden="true">·</span
-                >目前網格：<span id="source-grid">—</span>
+                >網格：<span id="source-grid">—</span>
               </p>
               <p class="inline-note" id="background-note"></p>
+              <p class="next-step-note" id="upload-next-step">圖片已載入。下一步：確認網格後開始裁切。</p>
               <label class="background-option" for="remove-light-background">
                 <input id="remove-light-background" type="checkbox" checked />
                 <span
@@ -158,12 +159,12 @@
                     <path d="M12 4v16M4 12h16" /></svg
                 ></span>
                 <div>
-                  <p class="overline">ALIGNMENT</p>
-                  <h2 id="crop-preview-title">預覽裁切格線</h2>
+                  <p class="overline">確認範圍</p>
+                  <h2 id="crop-preview-title">確認裁切範圍</h2>
                 </div>
               </div>
               <span class="preview-grid-badge" id="preview-grid-badge"
-                >4 × 6</span
+                >4 欄 × 6 行</span
               >
             </div>
             <div class="source-preview-frame checkerboard">
@@ -174,7 +175,7 @@
             </div>
             <div class="grid-controls">
               <div class="grid-control-copy">
-                <span id="grid-offset-label">紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。</span>
+                <span id="grid-offset-label">確認圖片內的網格，再拖曳格線微調。</span>
                 <span class="grid-legend" aria-hidden="true"><span><i class="grid-key grid-key--outer"></i>外框</span><span><i class="grid-key grid-key--inner"></i>可調格線</span></span>
               </div>
               <button
@@ -191,7 +192,7 @@
             </div>
           </section>
 
-          <section class="panel config-panel" aria-labelledby="config-title">
+          <section class="panel config-panel" id="config-panel" aria-labelledby="config-title">
             <div class="panel-heading">
               <span class="ui-icon-slot ui-icon-slot--sun" aria-hidden="true"
                 ><svg viewBox="0 0 24 24" fill="none">
@@ -199,8 +200,8 @@
                   <path d="M12 4v16M4 12h16" /></svg
               ></span>
               <div>
-                <p class="overline">GRID</p>
-                <h2 id="config-title">這次要幾張？</h2>
+                <p class="overline">貼圖設定</p>
+                <h2 id="config-title">張數與排列</h2>
               </div>
             </div>
             <fieldset class="count-options">
@@ -231,16 +232,16 @@
             </fieldset>
             <div class="grid-summary" aria-live="polite">
               <div>
-                <span class="summary-label">貼圖數量</span
+                <span class="summary-label">張數</span
                 ><strong id="selected-count">24 張</strong>
               </div>
               <div>
-                <span class="summary-label">排列方式</span
-                ><strong id="selected-grid">4 × 6</strong>
+                <span class="summary-label">網格</span
+                ><strong id="selected-grid">4 欄 × 6 行</strong>
               </div>
               <div>
-                <span class="summary-label">建議比例</span
-                ><strong id="selected-ratio">4:6</strong>
+                <span class="summary-label">圖片比例</span
+                ><strong id="selected-ratio">2:3</strong>
               </div>
             </div>
             <div class="size-guide" aria-live="polite">
@@ -253,13 +254,13 @@
             <section class="resolution-panel" aria-labelledby="resolution-title">
               <div class="resolution-heading">
                 <div>
-                  <p class="overline">RESOLUTION</p>
-                  <h3 id="resolution-title">清晰度與輸出</h3>
+                <p class="overline">輸出設定</p>
+                <h3 id="resolution-title">來源清晰度與下載格式</h3>
                 </div>
                 <span class="resolution-status" id="source-resolution-status">高清來源</span>
               </div>
               <fieldset class="resolution-options">
-                <legend>生成大圖品質</legend>
+                <legend>來源清晰度</legend>
                 <label class="resolution-option"
                   ><input type="radio" name="source-resolution" value="standard" /><span><strong>標準</strong><small>256 px／格</small></span></label
                 >
@@ -270,9 +271,9 @@
                   ><input type="radio" name="source-resolution" value="master" /><span><strong>主檔</strong><small>1024 px／格</small></span></label
                 >
               </fieldset>
-              <p class="resolution-note" id="source-resolution-note" aria-live="polite">推薦以 512 px／格生成大圖；它會更新 AI Prompt，不會放大已上傳圖片的真實細節。</p>
+              <p class="resolution-note" id="source-resolution-note" aria-live="polite">只影響 AI Prompt 建議，不會放大已上傳圖片。</p>
               <fieldset class="resolution-options export-resolution-options">
-                <legend>導出用途</legend>
+                <legend>下載格式</legend>
                 <label class="resolution-option is-selected"
                   ><input type="radio" name="export-resolution" value="line" checked /><span><strong>LINE</strong><small>最多 370 × 320</small></span></label
                 >
@@ -283,7 +284,7 @@
                   ><input type="radio" name="export-resolution" value="hd" /><span><strong>2× HD</strong><small>非 LINE 主檔</small></span></label
                 >
               </fieldset>
-              <p class="resolution-note" id="export-resolution-note" aria-live="polite">LINE 模式符合單張最多 370 × 320 px、1 MB 的上架規格。</p>
+              <p class="resolution-note" id="export-resolution-note" aria-live="polite">LINE：單張最多 370 × 320 px、1 MB。</p>
             </section>
             <details class="prompt-builder">
               <summary class="prompt-builder-header">
@@ -293,14 +294,14 @@
                 </div>
                 <span class="prompt-toggle"
                   ><span class="prompt-spec" id="prompt-spec"
-                    >24 張 · 4 × 6</span
+                    >24 張 · 4 欄 × 6 行</span
                   ><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="m7 10 5 5 5-5" /></svg
                 ></span>
               </summary>
               <div class="prompt-content">
                 <label class="prompt-label" for="sticker-phrases"
-                  >每行一則貼圖文字</label
+                  >每行一則文字，順序由左至右、由上至下</label
                 >
                 <textarea
                   id="sticker-phrases"
@@ -340,7 +341,8 @@
             <div
               class="ratio-warning"
               id="ratio-warning"
-              role="alert"
+              role="status"
+              aria-live="polite"
               hidden
             ></div>
           </section>
@@ -349,15 +351,15 @@
 
       <section class="export-bar" aria-label="裁切操作">
         <div>
-          <p class="overline">READY WHEN YOU ARE</p>
-          <strong>確認格線，讓貼圖出發</strong>
+          <p class="overline" id="export-bar-label">下一步</p>
+          <strong id="export-bar-title">先上傳圖片</strong>
         </div>
         <button class="primary-button" id="crop-button" type="button" disabled>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M7.2 8.2 17 18M17 6 7.2 15.8M6.5 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"
             /></svg
-          >開始裁切
+          ><span id="crop-button-label">先上傳圖片</span>
         </button>
         <div class="progress-panel" id="progress-panel" hidden>
           <div class="progress-label">
@@ -379,13 +381,26 @@
       >
         <div class="results-header">
           <div>
-            <p class="overline">ALL SET</p>
-            <h2 id="results-title">小可愛們準備好了！</h2>
+            <p class="overline">裁切完成</p>
+            <h2 id="results-title">貼圖可以下載了</h2>
             <p class="results-count" id="results-count" aria-live="polite">
               已完成 0 / 0 張
             </p>
           </div>
-          <span class="success-badge">✓ READY</span>
+          <div class="results-header-actions">
+            <span class="success-badge">✓ 已完成</span>
+            <button
+              class="primary-button results-download-button"
+              id="download-all-button"
+              type="button"
+              disabled
+            >
+              <span id="download-all-label">下載 ZIP（所有 PNG）</span
+              ><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div
           class="sticker-grid"
@@ -394,17 +409,7 @@
           aria-label="裁切結果"
         ></div>
         <div class="download-actions">
-          <button
-            class="primary-button"
-            id="download-all-button"
-            type="button"
-            disabled
-          >
-            <span id="download-all-label">下載 ZIP（所有 PNG）</span
-            ><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
-            </svg></button
-          ><button class="secondary-button" id="reset-button" type="button">
+          <button class="secondary-button" id="reset-button" type="button">
             再做一組
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M20 11a8 8 0 1 0-2.34 5.66L20 14.33M20 20v-5.67h-5.67" />

@@ -140,6 +140,10 @@
       "preview-grid-badge",
       "grid-offset-label",
       "reset-grid-button",
+      "config-panel",
+      "export-bar-label",
+      "export-bar-title",
+      "crop-button-label",
       "prompt-spec",
       "sticker-phrases",
       "prompt-count",
@@ -289,11 +293,11 @@
     });
 
     elements.selectedCount.textContent = count + " 張";
-    elements.selectedGrid.textContent = config.columns + " × " + config.rows;
-    elements.selectedRatio.textContent = "比例 " + config.columns + ":" + config.rows;
+    elements.selectedGrid.textContent = formatGridLabel(config);
+    elements.selectedRatio.textContent = formatSimplifiedRatio(config.columns, config.rows);
     elements.recommendedImageSize.textContent = sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px";
     elements.recommendedCellSize.textContent = sourceSpec.cellSize + " × " + sourceSpec.cellSize + " px";
-    elements.sourceGrid.textContent = state.sourceCanvas ? config.columns + " × " + config.rows : "—";
+    elements.sourceGrid.textContent = state.sourceCanvas ? formatGridLabel(config) : "—";
     renderPhraseEditor();
     if (state.sourceCanvas) {
       initializeGridLines();
@@ -349,7 +353,7 @@
     const missing = state.selectedCount - completed;
 
     elements.promptSpec.textContent =
-      state.selectedCount + " 張・" + config.columns + " × " + config.rows;
+      state.selectedCount + " 張・" + formatGridLabel(config);
     elements.promptCount.textContent = missing
       ? "已填 " + completed + " / " + state.selectedCount + " 句，還差 " + missing + " 句"
       : "已填 " + completed + " / " + state.selectedCount + " 句";
@@ -538,10 +542,10 @@
     const sourceSpec = getSourceImageSpec(state.selectedCount);
     const exportPreset = getExportPreset();
     elements.sourceResolutionStatus.textContent = sourceResolution.label + "來源";
-    elements.sourceResolutionNote.textContent = "推薦以 " + sourceResolution.description + " 生成大圖（" + sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px）；它會更新 AI Prompt，不會放大已上傳圖片的真實細節。";
+    elements.sourceResolutionNote.textContent = "建議以 " + sourceResolution.description + " 生成大圖（" + sourceSpec.imageWidth + " × " + sourceSpec.imageHeight + " px）。只更新 AI Prompt，不會放大已上傳圖片。";
     elements.exportResolutionNote.textContent = exportPreset.lineCompliant
-      ? "LINE 模式符合單張最多 370 × 320 px、1 MB 的上架規格。"
-      : exportPreset.label + " 是非 LINE 主檔；放大可增加像素尺寸，但無法憑空補回模糊來源的細節。";
+      ? "LINE：單張最多 370 × 320 px、1 MB。"
+      : exportPreset.label + "：非 LINE 上架檔；放大不會補回來源細節。";
   }
 
   async function handleFileUpload(file) {
@@ -588,7 +592,7 @@
       elements.sourceFileSize.textContent = formatBytes(file.size);
       elements.sourceTransparency.textContent = state.sourceHasTransparency ? "有 alpha" : "沒有";
       const activeConfig = getGridConfig(state.selectedCount);
-      elements.sourceGrid.textContent = activeConfig.columns + " × " + activeConfig.rows;
+      elements.sourceGrid.textContent = formatGridLabel(activeConfig);
       updateBackgroundNote();
       elements.imageSummary.hidden = false;
       renderCropPreview();
@@ -596,6 +600,7 @@
 
       updateRatioWarning();
       updateCropButton();
+      focusConfigurationAfterUpload();
     } catch (error) {
       console.error(error);
       resetSourceState();
@@ -652,17 +657,13 @@
     }
 
     elements.ratioWarning.textContent =
-      "⚠️ 目前選擇 " +
-      state.selectedCount +
-      " 張需要 " +
-      validation.config.columns +
-      " × " +
-      validation.config.rows +
-      "（外框比例 " +
-      formatRatio(validation.expectedRatio) +
-      "），但來源外框約為 " +
+      "ℹ️ 目前選擇 " +
+      formatGridLabel(validation.config) +
+      "（圖片比例 " +
+      formatSimplifiedRatio(validation.config.columns, validation.config.rows) +
+      "），來源約為 " +
       formatRatio(validation.actualRatio) +
-      "。這個檢查只比對整張圖片寬高，無法辨識圖片內是否真的有對應的格數；請改選正確張數或換成同樣比例的大圖。";
+      "。比例不符不會阻止裁切；請先確認圖片內的欄列，再拖曳格線微調。";
     elements.ratioWarning.hidden = false;
   }
 
@@ -702,14 +703,14 @@
 
     const notes = [];
     if (state.sourceHasTransparency) {
-      notes.push("已偵測透明背景，裁切後會保留透明區域並執行 Auto Trim。");
+      notes.push("已保留透明背景。");
     } else if (state.removeLightBackground) {
-      notes.push("已預設開啟近白背景移除，只會移除從圖片邊緣連通的近白區域；如需保留白底可手動關閉。");
+      notes.push("近白背景移除已開啟。");
     } else {
-      notes.push("近白背景移除目前已關閉，此圖片的白色背景會保留。");
+      notes.push("白色背景會保留。");
     }
     if (isLowResolution(state.sourceCanvas, state.selectedCount)) {
-      notes.push("⚠️ 圖片解析度可能不足，建議使用 AI 生成的高解析度圖片。");
+      notes.push("⚠️ 來源解析度偏低。");
     }
     const sourceSpec = getSourceImageSpec(state.selectedCount);
     const config = getGridConfig(state.selectedCount);
@@ -718,13 +719,52 @@
       state.sourceCanvas.height / config.rows
     );
     if (actualCellSize < sourceSpec.cellSize) {
-      notes.push("目前每格約 " + Math.round(actualCellSize) + " px，低於所選 " + sourceSpec.cellSize + " px／格；匯出放大不會補回真實細節。");
+      notes.push("每格約 " + Math.round(actualCellSize) + " px，放大不會補回細節。");
     }
     elements.backgroundNote.textContent = notes.join(" ");
   }
 
   function updateCropButton() {
-    elements.cropButton.disabled = !state.sourceCanvas || state.isProcessing;
+    const hasSource = Boolean(state.sourceCanvas);
+    let buttonLabel = "先上傳圖片";
+    let barLabel = "下一步";
+    let barTitle = "先上傳圖片";
+
+    if (state.isProcessing) {
+      buttonLabel = "正在裁切…";
+      barLabel = "處理中";
+      barTitle = "正在產生貼圖";
+    } else if (hasSource && state.stickers.length > 0) {
+      buttonLabel = "重新裁切 " + state.selectedCount + " 張";
+      barLabel = "已完成";
+      barTitle = "需要調整時可重新裁切";
+    } else if (hasSource) {
+      buttonLabel = "確認網格並裁切 " + state.selectedCount + " 張";
+      barLabel = "下一步";
+      barTitle = "確認網格後開始裁切";
+    }
+
+    elements.cropButton.disabled = !hasSource || state.isProcessing;
+    elements.cropButtonLabel.textContent = buttonLabel;
+    elements.exportBarLabel.textContent = barLabel;
+    elements.exportBarTitle.textContent = barTitle;
+  }
+
+  function focusConfigurationAfterUpload() {
+    if (!window.matchMedia("(max-width: 719px)").matches || !elements.configPanel) {
+      return;
+    }
+
+    window.requestAnimationFrame(function () {
+      const rect = elements.configPanel.getBoundingClientRect();
+      if (rect.top > window.innerHeight * 0.72) {
+        elements.configPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
+  function formatGridLabel(config) {
+    return config.columns + " 欄 × " + config.rows + " 行";
   }
 
   function initializeGridLines() {
@@ -747,7 +787,7 @@
   function renderCropPreview() {
     if (!state.sourceCanvas) {
       elements.cropPreviewSection.hidden = true;
-      elements.gridOffsetLabel.textContent = "紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。";
+      elements.gridOffsetLabel.textContent = "確認圖片內的網格，再拖曳格線微調。";
       return;
     }
 
@@ -832,9 +872,9 @@
     }
     context.restore();
 
-    elements.previewGridBadge.textContent = config.columns + " × " + config.rows;
+    elements.previewGridBadge.textContent = formatGridLabel(config);
     elements.gridOffsetLabel.textContent = state.activeGridLineLabel ||
-      "紅色實線可調整圖片外框；拖曳青色虛線或橘色點調整內部格線・最小格寬／高 " + MIN_GRID_CELL_SIZE + " px";
+      "確認圖片內的網格，再拖曳格線微調・最小格寬／高 " + MIN_GRID_CELL_SIZE + " px";
     elements.cropPreviewSection.hidden = false;
   }
 
@@ -1015,24 +1055,12 @@
       return;
     }
 
-    const ratioValidation = validateImageRatio(
-      state.sourceCanvas.width,
-      state.sourceCanvas.height,
-      state.selectedCount
-    );
-
-    if (!ratioValidation.isValid) {
-      showError("裁切已暫停，請先確認圖片比例與貼圖數量是否相符。", elements.errorMessage);
-      elements.ratioWarning.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
     state.isProcessing = true;
     clearError();
     clearStickers();
     elements.resultsSection.hidden = true;
     elements.progressPanel.hidden = false;
-    elements.cropButton.disabled = true;
+    updateCropButton();
     updateDownloadAllButton();
 
     const config = getGridConfig(state.selectedCount);
@@ -1267,15 +1295,15 @@
       return { valid: false, message: "⚠ 格式異常" };
     }
     if (!getExportPreset().lineCompliant) {
-      return { valid: true, message: getExportPreset().label + " 主檔（非 LINE）" };
+      return { valid: true, message: getExportPreset().label + "・非 LINE 上架檔" };
     }
     if (width > MAX_STICKER_WIDTH || height > MAX_STICKER_HEIGHT) {
-      return { valid: false, message: "⚠ 尺寸超限" };
+      return { valid: false, message: "⚠ 尺寸超限，需調整" };
     }
     if (blob.size > MAX_STICKER_BYTES) {
-      return { valid: false, message: "⚠️ 檔案過大" };
+      return { valid: false, message: "⚠ 檔案超過 1 MB" };
     }
-    return { valid: true, message: "✓ 符合基本規格" };
+    return { valid: true, message: "✓ 可用於 LINE" };
   }
 
   function getStickerFilename(index) {
@@ -1311,8 +1339,17 @@
       const meta = document.createElement("div");
       meta.className = "sticker-meta";
 
+      const fileDetails = document.createElement("div");
+      fileDetails.className = "sticker-file-details";
+
+      const filename = document.createElement("strong");
+      filename.className = "sticker-filename";
+      filename.textContent = sticker.filename;
+
       const dimensions = document.createElement("span");
+      dimensions.className = "sticker-dimensions";
       dimensions.textContent = sticker.width + " × " + sticker.height + " px";
+      fileDetails.append(filename, dimensions);
 
       const check = document.createElement("span");
       check.className = "sticker-check";
@@ -1320,8 +1357,9 @@
         check.classList.add("is-warning");
       }
       check.textContent = sticker.validation.message;
+      check.setAttribute("aria-label", "合規狀態：" + sticker.validation.message);
 
-      meta.append(dimensions, check);
+      meta.append(fileDetails, check);
 
       const actions = document.createElement("div");
       actions.className = "sticker-actions";
@@ -1563,7 +1601,7 @@
     elements.sourceTransparency.textContent = "—";
     elements.sourceGrid.textContent = "—";
     elements.backgroundNote.textContent = "";
-    elements.gridOffsetLabel.textContent = "紅色實線可調整圖片外框；青色虛線與橘色點可調整內部格線。";
+    elements.gridOffsetLabel.textContent = "確認圖片內的網格，再拖曳格線微調。";
     elements.removeLightBackground.checked = true;
     elements.removeLightBackground.disabled = false;
     setSourceWorkspaceState(false);
