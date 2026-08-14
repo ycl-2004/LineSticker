@@ -74,7 +74,16 @@
   const LOW_RESOLUTION_CELL_SIZE = 96;
   const MIN_GRID_CELL_SIZE = 32;
   const GRID_LINE_HIT_DISTANCE = 18;
-  const WHITE_BACKGROUND_THRESHOLD = 245;
+  const SEAM_AUTO_ALIGN_RADIUS_RATIO = 0.28;
+  const SEAM_LOCAL_SEARCH_RADIUS = 7;
+  const SEAM_SCORE_THRESHOLD = 0.32;
+  const SEAM_SCORE_PROMINENCE = 0.12;
+  const SEAM_MAX_BAND_RATIO = 0.45;
+  const SEAM_EXTRA_PADDING = 0;
+  const BACKGROUND_CANDIDATE_DISTANCE = 112;
+  const BACKGROUND_FULL_ALPHA_DISTANCE = 180;
+  const QUALITY_WHITE_RATIO_WARNING = 0.16;
+  const QUALITY_EDGE_RATIO_WARNING = 0.06;
   const CLOUD_FOLDER_URL =
     "https://docs.google.com/document/d/13Cl-Zr3Vk99Xa7McNSn-I8WwA6MdVRkHs1YmG45oulQ/edit";
 
@@ -85,12 +94,15 @@
     sourceFile: null,
     sourceImage: null,
     sourceCanvas: null,
+    sourceAnalysis: null,
     sourceHasTransparency: false,
     sourceObjectUrl: null,
     gridLinesX: null,
     gridLinesY: null,
     activeGridLineLabel: "",
     removeLightBackground: true,
+    autoSeamCleanup: true,
+    backgroundCleanupMode: "auto",
     phraseLines: createPhraseLines(),
     stickers: [],
     isProcessing: false
@@ -127,6 +139,8 @@
       "source-grid",
       "background-note",
       "remove-light-background",
+      "auto-seam-cleanup",
+      "cleanup-mode-note",
       "selected-count",
       "selected-grid",
       "selected-ratio",
@@ -139,6 +153,7 @@
       "crop-preview-canvas",
       "preview-grid-badge",
       "grid-offset-label",
+      "auto-align-grid-button",
       "reset-grid-button",
       "config-panel",
       "export-bar-label",
@@ -178,6 +193,7 @@
     elements.countInputs = Array.from(document.querySelectorAll('input[name="sticker-count"]'));
     elements.sourceResolutionInputs = Array.from(document.querySelectorAll('input[name="source-resolution"]'));
     elements.exportResolutionInputs = Array.from(document.querySelectorAll('input[name="export-resolution"]'));
+    elements.backgroundCleanupModeInputs = Array.from(document.querySelectorAll('input[name="background-cleanup-mode"]'));
   }
 
   function bindEvents() {
@@ -241,13 +257,47 @@
       resetGridPosition();
     });
 
+    elements.autoAlignGridButton.addEventListener("click", function () {
+      const alignedCount = autoAlignGridLines();
+      clearResultsAfterProcessingChange();
+      renderCropPreview();
+      elements.gridOffsetLabel.textContent = alignedCount
+        ? "已自動對齊 " + alignedCount + " 條可見分隔線；仍可拖曳微調。"
+        : "沒有偵測到連續分隔線，已保留目前網格。";
+    });
+
     elements.removeImageButton.addEventListener("click", function () {
       removeSourceImage();
     });
 
     elements.removeLightBackground.addEventListener("change", function () {
       state.removeLightBackground = elements.removeLightBackground.checked;
+      updateCleanupControls();
+      clearResultsAfterProcessingChange();
       updateBackgroundNote();
+    });
+
+    elements.autoSeamCleanup.addEventListener("change", function () {
+      state.autoSeamCleanup = elements.autoSeamCleanup.checked;
+      clearResultsAfterProcessingChange();
+      updateBackgroundNote();
+    });
+
+    elements.backgroundCleanupModeInputs.forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (!input.checked) {
+          return;
+        }
+        state.backgroundCleanupMode = input.value;
+        elements.backgroundCleanupModeInputs.forEach(function (modeInput) {
+          modeInput.closest(".cleanup-mode-option").classList.toggle("is-selected", modeInput.checked);
+        });
+        elements.cleanupModeNote.textContent = state.backgroundCleanupMode === "strong"
+          ? "強力模式也會清除封閉白區；請預覽確認眼白與白色道具。"
+          : "推薦智能模式；若文字內仍有白塊，再改用強力模式重新裁切。";
+        clearResultsAfterProcessingChange();
+        updateBackgroundNote();
+      });
     });
 
     elements.cropPreviewCanvas.addEventListener("pointerdown", handleGridPointerDown);
@@ -301,6 +351,7 @@
     renderPhraseEditor();
     if (state.sourceCanvas) {
       initializeGridLines();
+      autoAlignGridLines();
       updateBackgroundNote();
       renderCropPreview();
     }
@@ -579,11 +630,14 @@
 
       state.sourceImage = image;
       state.sourceCanvas = canvas;
-      state.sourceHasTransparency = detectTransparency(canvas);
+      state.sourceAnalysis = analyzeSourceCanvas(canvas);
+      state.sourceHasTransparency = state.sourceAnalysis.hasTransparency;
       initializeGridLines();
+      const alignedCount = autoAlignGridLines();
       state.removeLightBackground = !state.sourceHasTransparency;
       elements.removeLightBackground.checked = state.removeLightBackground;
       elements.removeLightBackground.disabled = state.sourceHasTransparency;
+      updateCleanupControls();
 
       elements.fileStatus.textContent = file.name + " 已準備好，可以開始裁切。";
       elements.sourceThumbnail.src = state.sourceObjectUrl;
@@ -596,6 +650,9 @@
       updateBackgroundNote();
       elements.imageSummary.hidden = false;
       renderCropPreview();
+      if (alignedCount) {
+        elements.gridOffsetLabel.textContent = "已自動對齊 " + alignedCount + " 條可見分隔線；仍可拖曳微調。";
+      }
       setSourceWorkspaceState(true);
 
       updateRatioWarning();
@@ -626,17 +683,44 @@
     });
   }
 
-  function detectTransparency(canvas) {
+  function analyzeSourceCanvas(canvas) {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const separatorCountsX = new Uint32Array(canvas.width);
+    const separatorCountsY = new Uint32Array(canvas.height);
+    let hasTransparency = false;
 
-    for (let index = 3; index < pixels.length; index += 4) {
-      if (pixels[index] < 255) {
-        return true;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const pixelIndex = (y * canvas.width + x) * 4;
+        const red = pixels[pixelIndex];
+        const green = pixels[pixelIndex + 1];
+        const blue = pixels[pixelIndex + 2];
+        const alpha = pixels[pixelIndex + 3];
+        if (alpha < 255) {
+          hasTransparency = true;
+        }
+        const maximum = Math.max(red, green, blue);
+        const minimum = Math.min(red, green, blue);
+        const brightness = (red + green + blue) / 3;
+        if (alpha > ALPHA_THRESHOLD && maximum - minimum <= 14 && brightness >= 165 && brightness < 250) {
+          separatorCountsX[x] += 1;
+          separatorCountsY[y] += 1;
+        }
       }
     }
 
-    return false;
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      hasTransparency: hasTransparency,
+      separatorScoresX: Float32Array.from(separatorCountsX, function (count) {
+        return count / canvas.height;
+      }),
+      separatorScoresY: Float32Array.from(separatorCountsY, function (count) {
+        return count / canvas.width;
+      })
+    };
   }
 
   function updateRatioWarning() {
@@ -705,9 +789,12 @@
     if (state.sourceHasTransparency) {
       notes.push("已保留透明背景。");
     } else if (state.removeLightBackground) {
-      notes.push("近白背景移除已開啟。");
+      notes.push(state.backgroundCleanupMode === "strong" ? "強力近白清理已開啟。" : "智能近白清理已開啟。");
     } else {
       notes.push("白色背景會保留。");
+    }
+    if (state.autoSeamCleanup) {
+      notes.push("會自動避開偵測到的灰色分隔線。");
     }
     if (isLowResolution(state.sourceCanvas, state.selectedCount)) {
       notes.push("⚠️ 來源解析度偏低。");
@@ -722,6 +809,28 @@
       notes.push("每格約 " + Math.round(actualCellSize) + " px，放大不會補回細節。");
     }
     elements.backgroundNote.textContent = notes.join(" ");
+  }
+
+  function updateCleanupControls() {
+    const backgroundControlsDisabled = state.sourceHasTransparency || !state.removeLightBackground;
+    elements.backgroundCleanupModeInputs.forEach(function (input) {
+      input.disabled = backgroundControlsDisabled;
+    });
+    elements.cleanupModeNote.textContent = state.sourceHasTransparency
+      ? "透明來源會直接保留 alpha，不需要近白去背。"
+      : state.backgroundCleanupMode === "strong"
+        ? "強力模式也會清除封閉白區；請預覽確認眼白與白色道具。"
+        : "推薦智能模式；若文字內仍有白塊，再改用強力模式重新裁切。";
+  }
+
+  function clearResultsAfterProcessingChange() {
+    if (!state.stickers.length) {
+      return;
+    }
+    clearStickers();
+    elements.resultsSection.hidden = true;
+    updateCropButton();
+    updateDownloadAllButton();
   }
 
   function updateCropButton() {
@@ -782,6 +891,110 @@
     state.gridLinesY = Array.from({ length: config.rows + 1 }, function (_, index) {
       return (state.sourceCanvas.height / config.rows) * index;
     });
+  }
+
+  function autoAlignGridLines() {
+    if (!state.sourceCanvas || !state.sourceAnalysis || !state.gridLinesX || !state.gridLinesY) {
+      return 0;
+    }
+
+    let alignedCount = 0;
+    const axes = [
+      { name: "x", lines: state.gridLinesX, length: state.sourceCanvas.width },
+      { name: "y", lines: state.gridLinesY, length: state.sourceCanvas.height }
+    ];
+
+    axes.forEach(function (axis) {
+      const averageCellSize = axis.length / (axis.lines.length - 1);
+      const searchRadius = Math.max(8, Math.round(averageCellSize * SEAM_AUTO_ALIGN_RADIUS_RATIO));
+      const alignedLines = axis.lines.slice();
+
+      for (let index = 1; index < axis.lines.length - 1; index += 1) {
+        const band = findSeparatorBand(
+          state.sourceAnalysis,
+          axis.name,
+          axis.lines[index],
+          searchRadius
+        );
+        if (!band || band.score < SEAM_SCORE_THRESHOLD) {
+          continue;
+        }
+
+        const candidate = (band.start + band.end) / 2;
+        const minimum = alignedLines[index - 1] + MIN_GRID_CELL_SIZE;
+        const maximum = axis.lines[index + 1] - MIN_GRID_CELL_SIZE;
+        if (candidate < minimum || candidate > maximum) {
+          continue;
+        }
+        alignedLines[index] = candidate;
+        alignedCount += 1;
+      }
+
+      if (axis.name === "x") {
+        state.gridLinesX = alignedLines;
+      } else {
+        state.gridLinesY = alignedLines;
+      }
+    });
+
+    return alignedCount;
+  }
+
+  function findSeparatorBand(sourceAnalysis, axis, position, searchRadius) {
+    if (!sourceAnalysis) {
+      return null;
+    }
+
+    const axisLength = axis === "x" ? sourceAnalysis.width : sourceAnalysis.height;
+    const center = Math.round(position);
+    const start = Math.max(1, center - searchRadius);
+    const end = Math.min(axisLength - 2, center + searchRadius);
+    let bestCoordinate = -1;
+    let bestScore = 0;
+    const scores = [];
+
+    for (let coordinate = start; coordinate <= end; coordinate += 1) {
+      const score = getSeparatorLineScore(sourceAnalysis, axis, coordinate);
+      scores.push({ coordinate: coordinate, score: score });
+      if (score > bestScore) {
+        bestScore = score;
+        bestCoordinate = coordinate;
+      }
+    }
+
+    const sortedScores = scores.map(function (entry) { return entry.score; }).sort(function (a, b) { return a - b; });
+    const baselineScore = sortedScores[Math.floor(sortedScores.length / 2)] || 0;
+    if (
+      bestCoordinate < 0 ||
+      bestScore < SEAM_SCORE_THRESHOLD ||
+      bestScore - baselineScore < SEAM_SCORE_PROMINENCE
+    ) {
+      return null;
+    }
+
+    const continuationScore = Math.max(0.16, bestScore * 0.4);
+    let bandStart = bestCoordinate;
+    let bandEnd = bestCoordinate;
+    function scoreAt(coordinate) {
+      return scores[coordinate - start] ? scores[coordinate - start].score : 0;
+    }
+    while (bandStart > start && scoreAt(bandStart - 1) >= continuationScore) {
+      bandStart -= 1;
+    }
+    while (bandEnd < end && scoreAt(bandEnd + 1) >= continuationScore) {
+      bandEnd += 1;
+    }
+    const maximumBandWidth = Math.max(8, Math.round(searchRadius * SEAM_MAX_BAND_RATIO));
+    if (bandEnd - bandStart + 1 > maximumBandWidth) {
+      return null;
+    }
+
+    return { start: bandStart, end: bandEnd, score: bestScore, prominence: bestScore - baselineScore };
+  }
+
+  function getSeparatorLineScore(sourceAnalysis, axis, coordinate) {
+    const scores = axis === "x" ? sourceAnalysis.separatorScoresX : sourceAnalysis.separatorScoresY;
+    return scores[coordinate] || 0;
   }
 
   function renderCropPreview() {
@@ -894,6 +1107,7 @@
 
   function resetGridPosition() {
     initializeGridLines();
+    clearResultsAfterProcessingChange();
     state.activeGridLineLabel = "已重設為標準等分網格";
     renderCropPreview();
     window.setTimeout(function () {
@@ -986,6 +1200,7 @@
     elements.cropPreviewCanvas.releasePointerCapture(event.pointerId);
     elements.cropPreviewCanvas.removeAttribute("data-dragging");
     elements.cropPreviewCanvas._gridDrag = null;
+    clearResultsAfterProcessingChange();
     state.activeGridLineLabel = "";
     renderCropPreview();
   }
@@ -1080,6 +1295,7 @@
         const trimmedCanvas = state.sourceHasTransparency || state.removeLightBackground
           ? trimTransparentArea(backgroundProcessedCanvas, TRIM_SAFETY_MARGIN)
           : backgroundProcessedCanvas;
+        const quality = analyzeStickerQuality(trimmedCanvas);
         const resizedCanvas = resizeSticker(trimmedCanvas);
         const blob = await canvasToBlob(resizedCanvas, "image/png");
 
@@ -1093,7 +1309,8 @@
           height: resizedCanvas.height,
           size: blob.size,
           valid: validation.valid,
-          validation: validation
+          validation: validation,
+          quality: quality
         });
 
         updateProgress(index + 1, total, "正在裁切貼圖…");
@@ -1117,10 +1334,11 @@
   }
 
   function cropCell(sourceCanvas, column, row, config) {
-    const left = Math.round(state.gridLinesX[column] + CELL_SAFE_MARGIN);
-    const top = Math.round(state.gridLinesY[row] + CELL_SAFE_MARGIN);
-    const right = Math.round(state.gridLinesX[column + 1] - CELL_SAFE_MARGIN);
-    const bottom = Math.round(state.gridLinesY[row + 1] - CELL_SAFE_MARGIN);
+    const bounds = getCellCropBounds(sourceCanvas, column, row, config);
+    const left = bounds.left;
+    const top = bounds.top;
+    const right = bounds.right;
+    const bottom = bounds.bottom;
     const width = Math.max(1, right - left);
     const height = Math.max(1, bottom - top);
     const canvas = document.createElement("canvas");
@@ -1135,6 +1353,44 @@
     }
     context.drawImage(sourceCanvas, left, top, width, height, 0, 0, width, height);
     return canvas;
+  }
+
+  function getCellCropBounds(sourceCanvas, column, row) {
+    const fallback = {
+      left: Math.round(state.gridLinesX[column] + CELL_SAFE_MARGIN),
+      top: Math.round(state.gridLinesY[row] + CELL_SAFE_MARGIN),
+      right: Math.round(state.gridLinesX[column + 1] - CELL_SAFE_MARGIN),
+      bottom: Math.round(state.gridLinesY[row + 1] - CELL_SAFE_MARGIN)
+    };
+
+    if (!state.autoSeamCleanup || !state.sourceAnalysis) {
+      return fallback;
+    }
+
+    const adaptive = {
+      left: resolveAdaptiveCropEdge("x", state.gridLinesX[column], "start", sourceCanvas.width, fallback.left),
+      top: resolveAdaptiveCropEdge("y", state.gridLinesY[row], "start", sourceCanvas.height, fallback.top),
+      right: resolveAdaptiveCropEdge("x", state.gridLinesX[column + 1], "end", sourceCanvas.width, fallback.right),
+      bottom: resolveAdaptiveCropEdge("y", state.gridLinesY[row + 1], "end", sourceCanvas.height, fallback.bottom)
+    };
+
+    if (adaptive.right - adaptive.left < MIN_GRID_CELL_SIZE || adaptive.bottom - adaptive.top < MIN_GRID_CELL_SIZE) {
+      return fallback;
+    }
+    return adaptive;
+  }
+
+  function resolveAdaptiveCropEdge(axis, position, side, axisLength, fallback) {
+    if (position <= 1 || position >= axisLength - 1) {
+      return fallback;
+    }
+    const band = findSeparatorBand(state.sourceAnalysis, axis, position, SEAM_LOCAL_SEARCH_RADIUS);
+    if (!band) {
+      return fallback;
+    }
+    return side === "start"
+      ? Math.min(axisLength - 1, Math.ceil(band.end + 1 + SEAM_EXTRA_PADDING))
+      : Math.max(1, Math.floor(band.start - SEAM_EXTRA_PADDING));
   }
 
   function getOpaqueEdgeFillColor(canvas) {
@@ -1161,58 +1417,154 @@
     const context = canvas.getContext("2d", { willReadFrequently: true });
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageData.data;
-    const visited = new Uint8Array(canvas.width * canvas.height);
-    const queue = [];
+    const pixelCount = canvas.width * canvas.height;
+    const backgroundColor = estimateLightBackgroundColor(imageData);
+    const candidateMask = new Uint8Array(pixelCount);
 
-    function enqueueIfBackground(x, y) {
-      if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
-        return;
-      }
-      const position = y * canvas.width + x;
-      if (visited[position]) {
-        return;
-      }
+    for (let position = 0; position < pixelCount; position += 1) {
       const pixelIndex = position * 4;
-      if (pixels[pixelIndex + 3] <= ALPHA_THRESHOLD || !isNearWhitePixel(pixels, pixelIndex)) {
-        return;
+      if (pixels[pixelIndex + 3] <= ALPHA_THRESHOLD) {
+        continue;
       }
-      visited[position] = 1;
-      queue.push(position);
+      const distance = getColorDistance(pixels, pixelIndex, backgroundColor);
+      const brightness = (pixels[pixelIndex] + pixels[pixelIndex + 1] + pixels[pixelIndex + 2]) / 3;
+      if (distance <= BACKGROUND_CANDIDATE_DISTANCE && brightness >= 135) {
+        candidateMask[position] = 1;
+      }
     }
 
-    for (let x = 0; x < canvas.width; x += 1) {
-      enqueueIfBackground(x, 0);
-      enqueueIfBackground(x, canvas.height - 1);
-    }
-    for (let y = 1; y < canvas.height - 1; y += 1) {
-      enqueueIfBackground(0, y);
-      enqueueIfBackground(canvas.width - 1, y);
-    }
-
-    let queueIndex = 0;
-    while (queueIndex < queue.length) {
-      const position = queue[queueIndex];
-      queueIndex += 1;
-      const pixelIndex = position * 4;
-      pixels[pixelIndex + 3] = 0;
-      const x = position % canvas.width;
-      const y = Math.floor(position / canvas.width);
-      enqueueIfBackground(x - 1, y);
-      enqueueIfBackground(x + 1, y);
-      enqueueIfBackground(x, y - 1);
-      enqueueIfBackground(x, y + 1);
+    if (state.backgroundCleanupMode === "strong") {
+      for (let position = 0; position < pixelCount; position += 1) {
+        if (candidateMask[position]) {
+          applyBackgroundTransparency(pixels, position * 4, backgroundColor);
+        }
+      }
+    } else {
+      removeEdgeConnectedBackground(
+        pixels,
+        candidateMask,
+        canvas.width,
+        canvas.height,
+        backgroundColor
+      );
     }
 
     context.putImageData(imageData, 0, 0);
     return canvas;
   }
 
-  function isNearWhitePixel(pixels, pixelIndex) {
-    return (
-      pixels[pixelIndex] >= WHITE_BACKGROUND_THRESHOLD &&
-      pixels[pixelIndex + 1] >= WHITE_BACKGROUND_THRESHOLD &&
-      pixels[pixelIndex + 2] >= WHITE_BACKGROUND_THRESHOLD
+  function removeEdgeConnectedBackground(pixels, candidateMask, width, height, backgroundColor) {
+    const queue = [];
+    const visited = new Uint8Array(width * height);
+
+    function enqueue(position) {
+      if (!candidateMask[position] || visited[position]) {
+        return;
+      }
+      visited[position] = 1;
+      queue.push(position);
+    }
+
+    for (let x = 0; x < width; x += 1) {
+      enqueue(x);
+      enqueue((height - 1) * width + x);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      enqueue(y * width);
+      enqueue(y * width + width - 1);
+    }
+
+    let queueIndex = 0;
+    while (queueIndex < queue.length) {
+      const position = queue[queueIndex];
+      queueIndex += 1;
+      applyBackgroundTransparency(pixels, position * 4, backgroundColor);
+      const x = position % width;
+      const y = Math.floor(position / width);
+
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          if (offsetX === 0 && offsetY === 0) {
+            continue;
+          }
+          const nextX = x + offsetX;
+          const nextY = y + offsetY;
+          if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) {
+            continue;
+          }
+          enqueue(nextY * width + nextX);
+        }
+      }
+    }
+  }
+
+  function estimateLightBackgroundColor(imageData) {
+    const samples = [];
+    const pixels = imageData.data;
+
+    function sample(x, y) {
+      const pixelIndex = (y * imageData.width + x) * 4;
+      const red = pixels[pixelIndex];
+      const green = pixels[pixelIndex + 1];
+      const blue = pixels[pixelIndex + 2];
+      const alpha = pixels[pixelIndex + 3];
+      const maximum = Math.max(red, green, blue);
+      const minimum = Math.min(red, green, blue);
+      const brightness = (red + green + blue) / 3;
+      if (alpha > ALPHA_THRESHOLD && brightness >= 190 && maximum - minimum <= 50) {
+        samples.push([red, green, blue, brightness]);
+      }
+    }
+
+    for (let x = 0; x < imageData.width; x += 1) {
+      sample(x, 0);
+      sample(x, imageData.height - 1);
+    }
+    for (let y = 1; y < imageData.height - 1; y += 1) {
+      sample(0, y);
+      sample(imageData.width - 1, y);
+    }
+
+    if (samples.length < 8) {
+      return [255, 255, 255];
+    }
+    samples.sort(function (first, second) { return second[3] - first[3]; });
+    const lightestSamples = samples.slice(0, Math.max(8, Math.ceil(samples.length * 0.6)));
+    return [0, 1, 2].map(function (channel) {
+      const values = lightestSamples.map(function (entry) { return entry[channel]; }).sort(function (a, b) { return a - b; });
+      return values[Math.floor(values.length / 2)];
+    });
+  }
+
+  function getColorDistance(pixels, pixelIndex, color) {
+    return Math.max(
+      Math.abs(pixels[pixelIndex] - color[0]),
+      Math.abs(pixels[pixelIndex + 1] - color[1]),
+      Math.abs(pixels[pixelIndex + 2] - color[2])
     );
+  }
+
+  function applyBackgroundTransparency(pixels, pixelIndex, backgroundColor) {
+    const distance = getColorDistance(pixels, pixelIndex, backgroundColor);
+    const alphaScale = Math.max(0, Math.min(1, (distance - 3) / (BACKGROUND_FULL_ALPHA_DISTANCE - 3)));
+    const originalAlpha = pixels[pixelIndex + 3] / 255;
+    const newAlpha = originalAlpha * alphaScale;
+
+    if (newAlpha * 255 <= ALPHA_THRESHOLD) {
+      pixels[pixelIndex] = 0;
+      pixels[pixelIndex + 1] = 0;
+      pixels[pixelIndex + 2] = 0;
+      pixels[pixelIndex + 3] = 0;
+      return;
+    }
+
+    if (alphaScale < 0.98) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        const foreground = (pixels[pixelIndex + channel] - backgroundColor[channel] * (1 - alphaScale)) / alphaScale;
+        pixels[pixelIndex + channel] = Math.max(0, Math.min(255, Math.round(foreground)));
+      }
+    }
+    pixels[pixelIndex + 3] = Math.round(newAlpha * 255);
   }
 
   function trimTransparentArea(canvas, safetyMargin) {
@@ -1261,6 +1613,52 @@
       trimmedCanvas.height
     );
     return trimmedCanvas;
+  }
+
+  function analyzeStickerQuality(canvas) {
+    if (!state.sourceHasTransparency && !state.removeLightBackground) {
+      return { valid: true, message: "白底已保留", whiteRatio: 0, edgeRatio: 0 };
+    }
+
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    const totalPixels = canvas.width * canvas.height;
+    const perimeterPixels = Math.max(1, canvas.width * 2 + Math.max(0, canvas.height - 2) * 2);
+    let residualWhitePixels = 0;
+    let opaqueEdgePixels = 0;
+
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const pixelIndex = (y * canvas.width + x) * 4;
+        const alpha = pixels[pixelIndex + 3];
+        if (alpha <= ALPHA_THRESHOLD) {
+          continue;
+        }
+        const red = pixels[pixelIndex];
+        const green = pixels[pixelIndex + 1];
+        const blue = pixels[pixelIndex + 2];
+        const maximum = Math.max(red, green, blue);
+        const minimum = Math.min(red, green, blue);
+        const brightness = (red + green + blue) / 3;
+        if (alpha >= 220 && brightness >= 245 && maximum - minimum <= 12) {
+          residualWhitePixels += 1;
+        }
+        if (x === 0 || y === 0 || x === canvas.width - 1 || y === canvas.height - 1) {
+          opaqueEdgePixels += 1;
+        }
+      }
+    }
+
+    const whiteRatio = residualWhitePixels / Math.max(1, totalPixels);
+    const edgeRatio = opaqueEdgePixels / perimeterPixels;
+    if (whiteRatio >= QUALITY_WHITE_RATIO_WARNING) {
+      return { valid: false, message: "⚠ 可能仍有白底", whiteRatio: whiteRatio, edgeRatio: edgeRatio };
+    }
+    if (edgeRatio >= QUALITY_EDGE_RATIO_WARNING) {
+      return { valid: false, message: "⚠ 來源內容碰到格線，請預覽", whiteRatio: whiteRatio, edgeRatio: edgeRatio };
+    }
+    return { valid: true, message: "✓ 邊緣已清理", whiteRatio: whiteRatio, edgeRatio: edgeRatio };
   }
 
   function resizeSticker(canvas) {
@@ -1313,8 +1711,9 @@
 
   function renderResults() {
     elements.stickerGrid.replaceChildren();
-    elements.resultsCount.textContent =
-      "已完成 " + state.stickers.length + " / " + state.selectedCount + " 張";
+    const warningCount = state.stickers.filter(function (sticker) { return !sticker.quality.valid; }).length;
+    elements.resultsCount.textContent = "已完成 " + state.stickers.length + " / " + state.selectedCount + " 張" +
+      (warningCount ? "・" + warningCount + " 張建議預覽" : "・邊緣檢查通過");
 
     state.stickers.forEach(function (sticker, index) {
       const card = document.createElement("article");
@@ -1359,7 +1758,15 @@
       check.textContent = sticker.validation.message;
       check.setAttribute("aria-label", "合規狀態：" + sticker.validation.message);
 
-      meta.append(fileDetails, check);
+      const quality = document.createElement("span");
+      quality.className = "sticker-quality";
+      if (!sticker.quality.valid) {
+        quality.classList.add("is-warning");
+      }
+      quality.textContent = sticker.quality.message;
+      quality.setAttribute("aria-label", "裁切品質：" + sticker.quality.message);
+
+      meta.append(fileDetails, check, quality);
 
       const actions = document.createElement("div");
       actions.className = "sticker-actions";
@@ -1565,11 +1972,20 @@
     resetSourceState();
     state.isProcessing = false;
     state.phraseLines = createPhraseLines();
+    state.autoSeamCleanup = true;
+    state.backgroundCleanupMode = "auto";
     elements.imageInput.value = "";
     elements.sourceThumbnail.removeAttribute("src");
     elements.sourceFileName.textContent = "—";
     elements.removeLightBackground.checked = true;
     elements.removeLightBackground.disabled = false;
+    elements.autoSeamCleanup.checked = true;
+    elements.backgroundCleanupModeInputs.forEach(function (input) {
+      input.checked = input.value === "auto";
+      input.disabled = false;
+      input.closest(".cleanup-mode-option").classList.toggle("is-selected", input.checked);
+    });
+    updateCleanupControls();
     elements.fileStatus.textContent = "尚未選擇圖片";
     elements.imageSummary.hidden = true;
     elements.resultsSection.hidden = true;
@@ -1590,11 +2006,14 @@
     state.sourceFile = null;
     state.sourceImage = null;
     state.sourceCanvas = null;
+    state.sourceAnalysis = null;
     state.sourceHasTransparency = false;
     state.gridLinesX = null;
     state.gridLinesY = null;
     state.activeGridLineLabel = "";
     state.removeLightBackground = true;
+    state.autoSeamCleanup = true;
+    state.backgroundCleanupMode = "auto";
     elements.cropPreviewSection.hidden = true;
     elements.sourceDimensions.textContent = "—";
     elements.sourceFileSize.textContent = "—";
@@ -1604,6 +2023,13 @@
     elements.gridOffsetLabel.textContent = "確認圖片內的網格，再拖曳格線微調。";
     elements.removeLightBackground.checked = true;
     elements.removeLightBackground.disabled = false;
+    elements.autoSeamCleanup.checked = true;
+    elements.backgroundCleanupModeInputs.forEach(function (input) {
+      input.checked = input.value === "auto";
+      input.disabled = false;
+      input.closest(".cleanup-mode-option").classList.toggle("is-selected", input.checked);
+    });
+    updateCleanupControls();
     setSourceWorkspaceState(false);
   }
 

@@ -54,7 +54,7 @@ svg { display: block; width: 1em; height: 1em; stroke: currentColor; stroke-widt
 .hero-guide strong { color: var(--ink); font-family: var(--font-mono); font-size: .67rem; letter-spacing: .02em; white-space: nowrap; }
 .hero-guide p span { text-align: right; }
 
-.workflow { display: grid; gap: 0; }
+.workflow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .panel, .crop-preview-section, .results-section { position: relative; padding: 20px 0; border-top: 1px solid var(--line); }
 .panel:first-child { border-top: 0; padding-top: 0; }
 .panel-heading, .preview-heading, .preview-title-copy { display: flex; align-items: flex-start; gap: 10px; }
@@ -99,6 +99,21 @@ h2 { font-size: 1.14rem; font-weight: 850; line-height: 1.13; }
 .background-option span { display: grid; gap: 2px; }
 .background-option small { color: var(--muted); font-size: .67rem; }
 .background-option input:disabled + span { opacity: .55; }
+.cleanup-settings { display: grid; gap: 9px; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 253, 249, .58); }
+.cleanup-toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--ink); font-size: .7rem; line-height: 1.35; }
+.cleanup-toggle input { width: 17px; height: 17px; flex: 0 0 auto; margin: 1px 0 0; accent-color: var(--mint-strong); }
+.cleanup-toggle span { display: grid; gap: 2px; }
+.cleanup-toggle small, .cleanup-note { color: var(--muted); font-size: .64rem; }
+.cleanup-mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; padding: 0; border: 0; }
+.cleanup-mode-options legend { grid-column: 1 / -1; margin-bottom: 2px; color: var(--muted); font-size: .62rem; font-weight: 750; }
+.cleanup-mode-option { position: relative; display: block; min-width: 0; }
+.cleanup-mode-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cleanup-mode-option span { display: grid; min-height: 47px; gap: 1px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--paper); }
+.cleanup-mode-option small { font-size: .6rem; }
+.cleanup-mode-option.is-selected span { border-color: var(--mint-strong); color: var(--ink); background: var(--mint); box-shadow: 1px 1px 0 var(--mint-strong); }
+.cleanup-mode-option input:focus-visible + span { outline: 3px solid rgba(201, 87, 91, .42); outline-offset: 2px; }
+.cleanup-mode-option input:disabled + span { opacity: .5; }
+.cleanup-note { margin: 0; line-height: 1.4; }
 
 .crop-preview-section { padding-top: 18px; border-top-style: dashed; }
 .preview-heading { align-items: center; justify-content: space-between; margin-bottom: 11px; }
@@ -111,6 +126,7 @@ h2 { font-size: 1.14rem; font-weight: 850; line-height: 1.13; }
 .source-preview-frame canvas[data-dragging="true"] { cursor: grabbing; }
 .grid-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--muted); font-size: .67rem; font-weight: 700; line-height: 1.35; }
 .grid-control-copy { display: grid; gap: 5px; min-width: 0; }
+.grid-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .grid-legend { display: inline-flex; flex-wrap: wrap; gap: 8px; color: var(--quiet); font-size: .6rem; font-weight: 700; }
 .grid-legend > span { display: inline-flex; align-items: center; gap: 4px; }
 .grid-key { display: inline-block; width: 20px; border-top: 5px solid var(--berry); box-shadow: 0 0 0 2px rgba(201, 87, 91, .18); }
@@ -206,6 +222,8 @@ h2 { font-size: 1.14rem; font-weight: 850; line-height: 1.13; }
 .sticker-dimensions { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: .58rem; white-space: nowrap; }
 .sticker-check { color: var(--mint-strong); font-size: .65rem; font-weight: 800; line-height: 1.25; }
 .sticker-check.is-warning { color: var(--danger); }
+.sticker-quality { color: var(--mint-strong); font-size: .62rem; font-weight: 750; line-height: 1.3; }
+.sticker-quality.is-warning { color: var(--danger); }
 .sticker-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
 .small-button { background: rgba(255, 229, 209, .72); font-size: .64rem; }
 .download-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 17px; }

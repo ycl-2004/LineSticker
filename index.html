@@ -139,9 +139,27 @@
                 <input id="remove-light-background" type="checkbox" checked />
                 <span
                   ><strong>移除近白背景</strong
-                  ><small>只移除圖片邊緣連通的近白區域。</small></span
+                  ><small>自動取樣背景色並柔化 JPEG 白邊。</small></span
                 >
               </label>
+              <div class="cleanup-settings" id="cleanup-settings">
+                <label class="cleanup-toggle" for="auto-seam-cleanup">
+                  <input id="auto-seam-cleanup" type="checkbox" checked />
+                  <span><strong>自動清除分隔線</strong><small>只在偵測到連續灰色格線時向內避開。</small></span>
+                </label>
+                <fieldset class="cleanup-mode-options">
+                  <legend>去背強度</legend>
+                  <label class="cleanup-mode-option is-selected">
+                    <input type="radio" name="background-cleanup-mode" value="auto" checked />
+                    <span><strong>智能</strong><small>保留白色物件</small></span>
+                  </label>
+                  <label class="cleanup-mode-option">
+                    <input type="radio" name="background-cleanup-mode" value="strong" />
+                    <span><strong>強力</strong><small>清除封閉白區</small></span>
+                  </label>
+                </fieldset>
+                <p class="cleanup-note" id="cleanup-mode-note">推薦智能模式；若文字內仍有白塊，再改用強力模式重新裁切。</p>
+              </div>
             </div>
           </section>
 
@@ -178,17 +196,18 @@
                 <span id="grid-offset-label">確認圖片內的網格，再拖曳格線微調。</span>
                 <span class="grid-legend" aria-hidden="true"><span><i class="grid-key grid-key--outer"></i>外框</span><span><i class="grid-key grid-key--inner"></i>可調格線</span></span>
               </div>
-              <button
-                class="grid-reset-button"
-                id="reset-grid-button"
-                type="button"
-              >
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M4 12a8 8 0 1 0 2.34-5.66L4 8.67M4 4v4.67h4.67"
-                  /></svg
-                >重設格線
-              </button>
+              <div class="grid-actions">
+                <button class="grid-reset-button" id="auto-align-grid-button" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 8h16M4 16h16M8 4v16M16 4v16" />
+                  </svg>自動對齊
+                </button>
+                <button class="grid-reset-button" id="reset-grid-button" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 12a8 8 0 1 0 2.34-5.66L4 8.67M4 4v4.67h4.67" />
+                  </svg>重設格線
+                </button>
+              </div>
             </div>
           </section>
 
