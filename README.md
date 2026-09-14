@@ -168,3 +168,5 @@ Settings
 - 自動辨識不規則網格或內部欄列。
 - 自動讀取或寫入 Google Drive／Google 文件。
 - 登入、帳號、資料庫、付款或雲端同步。
+
+<!-- achievement: pull-shark-1 -->
